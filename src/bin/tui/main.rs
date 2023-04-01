@@ -1,112 +1,115 @@
+pub mod stateful_list;
+pub mod stateful_tree;
+
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use zbus::{Connection, fdo::DBusProxy, xml::Node, names::OwnedBusName};
+use stateful_list::StatefulList;
+use stateful_tree::StatefulTree;
+use tui_tree_widget::{Tree, TreeItem};
 use std::{
+    collections::HashMap,
     error::Error,
     io,
-    time::{Duration, Instant}, str::FromStr,
+    str::FromStr,
+    time::{Duration, Instant}, path,
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Corner, Direction, Layout},
-    style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    layout::{Constraint, Direction, Layout},
+    style::{Modifier, Style, Color},
+    text::Spans,
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
+use zbus::{
+    fdo::DBusProxy,
+    names::{OwnedBusName, OwnedInterfaceName},
+    xml::Node,
+    zvariant::{ObjectPath, OwnedObjectPath, OwnedValue},
+    Connection,
+};
 
-struct StatefulList<T> {
-    state: ListState,
-    items: Vec<T>,
+enum WorkingArea {
+    Services,
+    Objects,
 }
 
-impl<T> StatefulList<T> {
-    fn with_items(items: Vec<T>) -> StatefulList<T> {
-        StatefulList {
-            state: ListState::default(),
-            items,
-        }
-    }
-
-    fn next(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.items.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-
-    fn previous(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.items.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-
-    fn unselect(&mut self) {
-        self.state.select(None);
-    }
-}
-
-/// This struct holds the current state of the app. In particular, it has the `items` field which is a wrapper
-/// around `ListState`. Keeping track of the items state let us render the associated widget with its state
-/// and have access to features such as natural scrolling.
-///
-/// Check the event handling at the bottom to see how to change the state on incoming events.
-/// Check the drawing logic for items on how to specify the highlighting style for selected items.
-struct App {
+struct App<'a> {
+    connection: Connection,
     services: StatefulList<OwnedBusName>,
     interfaces: Option<Node>,
+    objects: StatefulTree<'a>,
+    // objects: Option<
+    //     HashMap<
+    //         OwnedObjectPath,
+    //         HashMap<OwnedInterfaceName, HashMap<std::string::String, OwnedValue>>,
+    //     >,
+    // >,
+    working_area : WorkingArea, 
 }
 
-impl App {
-    fn new(busnames: Vec<OwnedBusName>) -> App {
+impl<'a> App<'a> {
+    fn new(connection: Connection) -> App<'a> {
         App {
-            services: StatefulList::with_items(busnames),
-            interfaces: None
+            connection: connection,
+            services: StatefulList::with_items(vec![]),
+            interfaces: None,
+            objects: StatefulTree::new(),
+            working_area: WorkingArea::Services,
         }
     }
 
-    /// Rotate through the event list.
-    /// This only exists to simulate some kind of "progress"
-    fn on_tick(&mut self) {
+    fn on_tick(&self) {}
+
+    async fn get_interfaces_as_tree(&self, 
+                                    busname: &OwnedBusName,
+                                    path: &ObjectPath<'_>) -> Result<StatefulTree<'a>, zbus::Error> {
+        let interfaces = self.get_interfaces(busname, path).await?;
+        Ok(StatefulTree::new())
+    }
+
+    async fn get_services(&self) -> Result<Vec<OwnedBusName>, zbus::fdo::Error> {
+        let dbusproxy = DBusProxy::new(&self.connection).await?;
+        dbusproxy.list_names().await
+    }
+
+    //If this takes a path as well, it can call itself recursively and fill up its nodes
+    async fn get_interfaces(
+        &self,
+        busname: &OwnedBusName,
+        path: &ObjectPath<'_>,
+    ) -> Result<Node, zbus::Error> {
+        let introspectable_proxy = zbus::fdo::IntrospectableProxy::builder(&self.connection)
+            .destination(busname)?
+            .path(path)?
+            .build()
+            .await?;
+
+        let introspect_xml = introspectable_proxy.introspect().await?;
+        Node::from_str(&introspect_xml)
+    }
+
+    async fn get_objects(
+        &self,
+        busname: &OwnedBusName,
+    ) -> Result<
+        HashMap<
+            OwnedObjectPath,
+            HashMap<OwnedInterfaceName, HashMap<std::string::String, OwnedValue>>,
+        >,
+        zbus::fdo::Error,
+    > {
+        let object_manager = zbus::fdo::ObjectManagerProxy::builder(&self.connection)
+            .destination(busname)?
+            .path("/")?
+            .build()
+            .await?;
+        object_manager.get_managed_objects().await
     }
 }
-
-async fn get_services() -> Result<Vec<OwnedBusName>, zbus::fdo::Error> {
-    let connection = Connection::system().await?;
-
-    let dbusproxy = DBusProxy::new(&connection).await?;
-    dbusproxy.list_names().await
-}
-
-async fn get_interfaces(busname: &OwnedBusName) -> Result<Node, zbus::Error> {
-    let connection = Connection::system().await?;
-    let introspectableProxy = zbus::fdo::IntrospectableProxy::builder(&connection)
-                                .destination(busname)?
-                                .build().await?;
-
-    let introspect_xml = introspectableProxy.introspect().await?;
-    dbg!(&introspect_xml);
-    Node::from_str(&introspect_xml)
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // setup terminal
@@ -118,8 +121,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // create app and run it
     let tick_rate = Duration::from_millis(250);
-    let services = get_services().await?;
-    let app = App::new(services);
+    let connection = Connection::session().await?;
+    let app = App::new(connection);
     let res = run_app(&mut terminal, app, tick_rate).await;
 
     // restore terminal
@@ -140,10 +143,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 async fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut app: App,
+    mut app: App<'_>,
     tick_rate: Duration,
 ) -> Result<(), zbus::Error> {
     let mut last_tick = Instant::now();
+    app.services = StatefulList::with_items(app.get_services().await?);
     loop {
         terminal.draw(|frame| ui(frame, &mut app))?;
 
@@ -156,13 +160,52 @@ async fn run_app<B: Backend>(
                     KeyCode::Char('q') => return Ok(()),
                     KeyCode::Enter => {
                         if let Some(selected_index) = app.services.state.selected() {
-                            app.interfaces = Some(get_interfaces(&app.services.items[selected_index]).await?)
+                            let timeout_duration = Duration::from_secs(1);
+                            let item = app.services.items[selected_index].clone();
+                            if let Ok(timeout) =
+                                tokio::time::timeout(timeout_duration, app.get_objects(&item)).await
+                            {
+                                //app.objects = Some(timeout.unwrap_or_default());
+                            }
+                            if let Ok(timeout) = tokio::time::timeout(
+                                timeout_duration,
+                                app.get_interfaces(
+                                    &item,
+                                    &ObjectPath::try_from("/").unwrap_or_default(),
+                                ),
+                            )
+                            .await
+                            {
+                                app.interfaces = timeout.ok();
+                            }
                         }
-                    },
-                    KeyCode::Left => app.services.unselect(),
-                    KeyCode::Down => app.services.next(),
-                    KeyCode::Up => app.services.previous(),
-                    _ => {}
+                    }
+                    KeyCode::Left => {
+                        match app.working_area {
+                            WorkingArea::Services => app.services.unselect(),
+                            WorkingArea::Objects =>  app.working_area = WorkingArea::Services,
+                        }
+                    }
+                    KeyCode::Down => {
+                      match app.working_area {
+                        WorkingArea::Services => app.services.next(),
+                        WorkingArea::Objects => app.objects.down(),  
+                        }
+                    }
+                    KeyCode::Up => {
+                        match app.working_area {
+                            WorkingArea::Services => app.services.previous(),
+                            WorkingArea::Objects => app.objects.up(),
+                        }
+                    }
+                    KeyCode::Right => {
+                        match app.working_area {
+                            WorkingArea::Services => app.
+                            working_area = WorkingArea::Objects,
+                            WorkingArea::Objects => app.objects.right(),
+                        }
+                    }
+                    _ => ()
                 }
             }
         }
@@ -193,31 +236,54 @@ fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
 
     // Create a List from all list items and highlight the currently selected one
     let items = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("List"))
-        .highlight_style(
-            Style::default()
-                .add_modifier(Modifier::BOLD),
-        )
+        .block(Block::default().borders(Borders::ALL).title("Services"))
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
     // We can now render the item list
     frame.render_stateful_widget(items, chunks[0], &mut app.services.state);
 
-    // Let's do the same for the events.
-    // The event list doesn't have any state and only displays the current state of the list.
-    
-    let a : String = app.interfaces.as_ref().map_or("default".to_string(), |node| {
-        node.interfaces().into_iter()
-            .map(|interface|
-            {
-                interface.name()
-            })
-            .collect::<Vec<&str>>().join("\n")
-    });
-
-
-    let paragraph = Paragraph::new(a)
-        .block(Block::default().borders(Borders::ALL).title("Interfaces"));
-
-    frame.render_widget(paragraph, chunks[1]);
+    let objects: String = app
+        .interfaces
+        .as_ref()
+        .map_or("Nothing".to_string(), |node| {
+            node.nodes()
+                .into_iter()
+                .map(|node| {
+                    let mut description = String::new();
+                    if let Some(name) = node.name() {
+                        description.push('/');
+                        description.push_str(name);
+                        description.push('\n');
+                    }
+                    description.push('\t');
+                    node.interfaces()
+                        .into_iter()
+                        .fold(description, |acc, interface| {
+                            acc + interface.methods()[0].name() + "\n"
+                        })
+                })
+                .collect::<Vec<String>>()
+                .join("\n")
+        });
+    // let objects_view = Paragraph::new(objects)
+    //     .style(Style::default())
+    //     .block(Block::default().borders(Borders::ALL).title("Objects"))
+    //     .alignment(tui::layout::Alignment::Left)
+    //     .wrap(tui::widgets::Wrap { trim: true });
+    let objects_view =  Tree::new(app.objects.items.clone())
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .title(format!("Tree Widget {:?}", app.objects.state)),
+                )
+                .highlight_style(
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::LightGreen)
+                        .add_modifier(Modifier::BOLD),
+                )
+                .highlight_symbol(">> ");   
+    frame.render_stateful_widget(objects_view, chunks[1], &mut app.objects.state);
+    //frame.render_widget(objects_view, chunks[1]);
 }
