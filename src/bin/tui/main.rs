@@ -162,9 +162,11 @@ async fn run_app<B: Backend>(
                         if let Some(selected_index) = app.services.state.selected() {
                             let timeout_duration = Duration::from_secs(1);
                             let item = app.services.items[selected_index].clone();
-                            if let Ok(timeout) =
+                            if let Ok(objects) =
                                 tokio::time::timeout(timeout_duration, app.get_objects(&item)).await
                             {
+
+                                // app.objects = StatefulTree::with_items(objects.unwrap());
                                 //app.objects = Some(timeout.unwrap_or_default());
                             }
                             if let Ok(timeout) = tokio::time::timeout(

@@ -1,13 +1,13 @@
 use std::str::FromStr;
 
-use zbus::fdo::DBusProxy;
+use zbus::fdo::{DBusProxy, ObjectManagerProxy};
 use zbus::xml::Node;
 use zbus::zvariant::ObjectPath;
 use zbus::{Connection, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let connection = Connection::session().await?;
+    let connection = Connection::system().await?;
 
     // `dbus_proxy` macro creates `MyGreaterProxy` based on `Notifications` trait.
     let dbusproxy = DBusProxy::new(&connection).await?;
@@ -18,6 +18,13 @@ async fn main() -> Result<()> {
             continue;
         }
         println!("Service: {}", service.as_str());
+        let object_manager = zbus::fdo::ObjectManagerProxy::builder(&connection)
+            .destination(&service)?
+            .build()
+            .await?;
+
+        let test = object_manager.get_managed_objects().await?;
+        dbg!(test);
         let path_name = "/".to_string() + &(service.as_str().replace('.', "/"));
         println!("Path name {}", path_name);
         let path = ObjectPath::try_from(path_name)?;
@@ -34,6 +41,7 @@ async fn main() -> Result<()> {
             introspect
                 .unwrap()
                 .interfaces()
+
                 .into_iter()
                 .map(|interface| { interface.name() })
                 .collect::<Vec<&str>>()
