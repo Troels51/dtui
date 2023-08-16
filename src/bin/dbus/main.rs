@@ -1,15 +1,87 @@
 use std::str::FromStr;
 
-use zbus::fdo::{DBusProxy, ObjectManagerProxy};
-use zbus::xml::Node;
+use async_recursion::async_recursion;
+use zbus::fdo::{DBusProxy};
+use zbus::names::OwnedBusName;
+use zbus::xml::{Node, Interface};
 use zbus::zvariant::ObjectPath;
 use zbus::{Connection, Result};
 
+#[async_recursion]
+async fn print_all_interfaces(connection: &Connection, service: &OwnedBusName, path: ObjectPath<'async_recursion>, indent: usize) -> std::result::Result<(), zbus::Error>{
+
+    println!(
+        "{:indent$}{} ", "",
+        path.as_str(),
+            indent=indent);
+    let introspectable_proxy = zbus::fdo::IntrospectableProxy::builder(&connection)
+        .destination(service)?
+        .path(path.clone())?
+        .build()
+        .await?;
+    let introspect_xml = introspectable_proxy.introspect().await?;
+    let introspect = Node::from_str(&introspect_xml)?;
+    println!(
+        "{:indent$}Interfaces: ", "",
+            indent=indent+4);
+    for interface in introspect.interfaces() {
+        println!(
+            "{:indent$}{} ", "",
+            interface.name(),
+                indent=indent+8);
+        println!(
+            "{:indent$}Methods: ", "", indent=indent+12);
+        for method in interface.methods() {
+            println!(
+                "{:indent$}{} ", "",
+                method.name(),
+                    indent=indent+16);
+        }
+        println!(
+            "{:indent$}Signals: ", "", indent=indent+12);
+        for signal in interface.signals() {
+            println!(
+                "{:indent$}{} ", "",
+                signal.name(),
+                    indent=indent+16);
+        }
+        println!(
+            "{:indent$}Properties: ", "", indent=indent+12);
+        for property in interface.properties() {
+            println!(
+                "{:indent$}{} ", "",
+                property.name(),
+                    indent=indent+16);
+        }
+        println!(
+            "{:indent$}Annotations: ", "", indent=indent+12);
+        for annotation in interface.annotations() {
+            println!(
+                "{:indent$}{} ", "",
+                annotation.name(),
+                    indent=indent+16);
+        }
+    }
+    for node in introspect.nodes() {
+        let node_name = node.name().unwrap();
+        
+        let path_name = if path.as_str().ends_with('/'){
+            path.as_str().to_string() + node_name
+        }
+        else {
+            path.as_str().to_string() + "/" + node_name
+        };
+        let sub_path = ObjectPath::try_from(path_name)?;
+
+        print_all_interfaces(connection, service, sub_path, indent).await?;
+    }
+    Ok(())
+
+}
 #[tokio::main]
 async fn main() -> Result<()> {
-    let connection = Connection::system().await?;
+    let connection = Connection::session().await?;
 
-    // `dbus_proxy` macro creates `MyGreaterProxy` based on `Notifications` trait.
     let dbusproxy = DBusProxy::new(&connection).await?;
     let reply = dbusproxy.list_names().await?;
     let _service = reply.first().unwrap();
@@ -18,35 +90,10 @@ async fn main() -> Result<()> {
             continue;
         }
         println!("Service: {}", service.as_str());
-        let object_manager = zbus::fdo::ObjectManagerProxy::builder(&connection)
-            .destination(&service)?
-            .build()
-            .await?;
-
-        let test = object_manager.get_managed_objects().await?;
-        dbg!(test);
         let path_name = "/".to_string() + &(service.as_str().replace('.', "/"));
         println!("Path name {}", path_name);
         let path = ObjectPath::try_from(path_name)?;
-        let introspectable_proxy = zbus::fdo::IntrospectableProxy::builder(&connection)
-            .destination(&service)?
-            .path(&path)?
-            .build()
-            .await?;
-
-        let introspect_xml = introspectable_proxy.introspect().await?;
-        let introspect = Node::from_str(&introspect_xml);
-        println!(
-            "{} ",
-            introspect
-                .unwrap()
-                .interfaces()
-
-                .into_iter()
-                .map(|interface| { interface.name() })
-                .collect::<Vec<&str>>()
-                .join("\n")
-        );
+        print_all_interfaces(&connection, &service, path, 4).await?;
     }
 
     Ok(())
