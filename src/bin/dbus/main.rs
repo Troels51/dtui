@@ -90,8 +90,7 @@ async fn main() -> Result<()> {
             continue;
         }
         println!("Service: {}", service.as_str());
-        let path_name = "/".to_string() + &(service.as_str().replace('.', "/"));
-        println!("Path name {}", path_name);
+        let path_name = "/".to_string();
         let path = ObjectPath::try_from(path_name)?;
         print_all_interfaces(&connection, &service, path, 4).await?;
     }
