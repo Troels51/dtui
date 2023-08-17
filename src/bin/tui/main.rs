@@ -8,22 +8,22 @@ use crossterm::{
 };
 use stateful_list::StatefulList;
 use stateful_tree::StatefulTree;
-use tui_tree_widget::{Tree, TreeItem};
 use std::{
     collections::HashMap,
     error::Error,
-    io,
+    io, path,
     str::FromStr,
-    time::{Duration, Instant}, path,
+    time::{Duration, Instant},
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
-    style::{Modifier, Style, Color},
+    style::{Color, Modifier, Style},
     text::Spans,
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
+use tui_tree_widget::{Tree, TreeItem};
 use zbus::{
     fdo::DBusProxy,
     names::{OwnedBusName, OwnedInterfaceName},
@@ -48,7 +48,7 @@ struct App<'a> {
     //         HashMap<OwnedInterfaceName, HashMap<std::string::String, OwnedValue>>,
     //     >,
     // >,
-    working_area : WorkingArea, 
+    working_area: WorkingArea,
 }
 
 impl<'a> App<'a> {
@@ -64,9 +64,11 @@ impl<'a> App<'a> {
 
     fn on_tick(&self) {}
 
-    async fn get_interfaces_as_tree(&self, 
-                                    busname: &OwnedBusName,
-                                    path: &ObjectPath<'_>) -> Result<StatefulTree<'a>, zbus::Error> {
+    async fn get_interfaces_as_tree(
+        &self,
+        busname: &OwnedBusName,
+        path: &ObjectPath<'_>,
+    ) -> Result<StatefulTree<'a>, zbus::Error> {
         let interfaces = self.get_interfaces(busname, path).await?;
         Ok(StatefulTree::new())
     }
@@ -182,32 +184,23 @@ async fn run_app<B: Backend>(
                             }
                         }
                     }
-                    KeyCode::Left => {
-                        match app.working_area {
-                            WorkingArea::Services => app.services.unselect(),
-                            WorkingArea::Objects =>  app.working_area = WorkingArea::Services,
-                        }
-                    }
-                    KeyCode::Down => {
-                      match app.working_area {
+                    KeyCode::Left => match app.working_area {
+                        WorkingArea::Services => app.services.unselect(),
+                        WorkingArea::Objects => app.working_area = WorkingArea::Services,
+                    },
+                    KeyCode::Down => match app.working_area {
                         WorkingArea::Services => app.services.next(),
-                        WorkingArea::Objects => app.objects.down(),  
-                        }
-                    }
-                    KeyCode::Up => {
-                        match app.working_area {
-                            WorkingArea::Services => app.services.previous(),
-                            WorkingArea::Objects => app.objects.up(),
-                        }
-                    }
-                    KeyCode::Right => {
-                        match app.working_area {
-                            WorkingArea::Services => app.
-                            working_area = WorkingArea::Objects,
-                            WorkingArea::Objects => app.objects.right(),
-                        }
-                    }
-                    _ => ()
+                        WorkingArea::Objects => app.objects.down(),
+                    },
+                    KeyCode::Up => match app.working_area {
+                        WorkingArea::Services => app.services.previous(),
+                        WorkingArea::Objects => app.objects.up(),
+                    },
+                    KeyCode::Right => match app.working_area {
+                        WorkingArea::Services => app.working_area = WorkingArea::Objects,
+                        WorkingArea::Objects => app.objects.right(),
+                    },
+                    _ => (),
                 }
             }
         }
@@ -273,19 +266,19 @@ fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
     //     .block(Block::default().borders(Borders::ALL).title("Objects"))
     //     .alignment(tui::layout::Alignment::Left)
     //     .wrap(tui::widgets::Wrap { trim: true });
-    let objects_view =  Tree::new(app.objects.items.clone())
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .title(format!("Tree Widget {:?}", app.objects.state)),
-                )
-                .highlight_style(
-                    Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::LightGreen)
-                        .add_modifier(Modifier::BOLD),
-                )
-                .highlight_symbol(">> ");   
+    let objects_view = Tree::new(app.objects.items.clone())
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!("Tree Widget {:?}", app.objects.state)),
+        )
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::LightGreen)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
     frame.render_stateful_widget(objects_view, chunks[1], &mut app.objects.state);
     //frame.render_widget(objects_view, chunks[1]);
 }

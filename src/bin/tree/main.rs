@@ -1,19 +1,20 @@
 use std::str::FromStr;
 
 use async_recursion::async_recursion;
-use zbus::fdo::{DBusProxy};
+use zbus::fdo::DBusProxy;
 use zbus::names::OwnedBusName;
-use zbus::xml::{Node, Interface};
+use zbus::xml::{Interface, Node};
 use zbus::zvariant::ObjectPath;
 use zbus::{Connection, Result};
 
 #[async_recursion]
-async fn print_all_interfaces(connection: &Connection, service: &OwnedBusName, path: ObjectPath<'async_recursion>, indent: usize) -> std::result::Result<(), zbus::Error>{
-
-    println!(
-        "{:indent$}{} ", "",
-        path.as_str(),
-            indent=indent);
+async fn print_all_interfaces(
+    connection: &Connection,
+    service: &OwnedBusName,
+    path: ObjectPath<'async_recursion>,
+    indent: usize,
+) -> std::result::Result<(), zbus::Error> {
+    println!("{:indent$}{} ", "", path.as_str(), indent = indent);
     let introspectable_proxy = zbus::fdo::IntrospectableProxy::builder(&connection)
         .destination(service)?
         .path(path.clone())?
@@ -21,54 +22,32 @@ async fn print_all_interfaces(connection: &Connection, service: &OwnedBusName, p
         .await?;
     let introspect_xml = introspectable_proxy.introspect().await?;
     let introspect = Node::from_str(&introspect_xml)?;
-    println!(
-        "{:indent$}Interfaces: ", "",
-            indent=indent+4);
+    println!("{:indent$}Interfaces: ", "", indent = indent + 4);
     for interface in introspect.interfaces() {
-        println!(
-            "{:indent$}{} ", "",
-            interface.name(),
-                indent=indent+8);
-        println!(
-            "{:indent$}Methods: ", "", indent=indent+12);
+        println!("{:indent$}{} ", "", interface.name(), indent = indent + 8);
+        println!("{:indent$}Methods: ", "", indent = indent + 12);
         for method in interface.methods() {
-            println!(
-                "{:indent$}{} ", "",
-                method.name(),
-                    indent=indent+16);
+            println!("{:indent$}{} ", "", method.name(), indent = indent + 16);
         }
-        println!(
-            "{:indent$}Signals: ", "", indent=indent+12);
+        println!("{:indent$}Signals: ", "", indent = indent + 12);
         for signal in interface.signals() {
-            println!(
-                "{:indent$}{} ", "",
-                signal.name(),
-                    indent=indent+16);
+            println!("{:indent$}{} ", "", signal.name(), indent = indent + 16);
         }
-        println!(
-            "{:indent$}Properties: ", "", indent=indent+12);
+        println!("{:indent$}Properties: ", "", indent = indent + 12);
         for property in interface.properties() {
-            println!(
-                "{:indent$}{} ", "",
-                property.name(),
-                    indent=indent+16);
+            println!("{:indent$}{} ", "", property.name(), indent = indent + 16);
         }
-        println!(
-            "{:indent$}Annotations: ", "", indent=indent+12);
+        println!("{:indent$}Annotations: ", "", indent = indent + 12);
         for annotation in interface.annotations() {
-            println!(
-                "{:indent$}{} ", "",
-                annotation.name(),
-                    indent=indent+16);
+            println!("{:indent$}{} ", "", annotation.name(), indent = indent + 16);
         }
     }
     for node in introspect.nodes() {
         let node_name = node.name().unwrap();
-        
-        let path_name = if path.as_str().ends_with('/'){
+
+        let path_name = if path.as_str().ends_with('/') {
             path.as_str().to_string() + node_name
-        }
-        else {
+        } else {
             path.as_str().to_string() + "/" + node_name
         };
         let sub_path = ObjectPath::try_from(path_name)?;
@@ -76,7 +55,6 @@ async fn print_all_interfaces(connection: &Connection, service: &OwnedBusName, p
         print_all_interfaces(connection, service, sub_path, indent).await?;
     }
     Ok(())
-
 }
 #[tokio::main]
 async fn main() -> Result<()> {
