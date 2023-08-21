@@ -1,3 +1,5 @@
+pub mod dbus_handler;
+pub mod messages;
 pub mod stateful_list;
 pub mod stateful_tree;
 
@@ -6,6 +8,8 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use dbus_handler::{DbusActor, DbusActorHandle};
+use messages::{AppMessage, DbusMessage};
 use stateful_list::StatefulList;
 use stateful_tree::StatefulTree;
 use std::{
@@ -14,6 +18,10 @@ use std::{
     io, path,
     str::FromStr,
     time::{Duration, Instant},
+};
+use tokio::{
+    select,
+    sync::mpsc::{self, Receiver, Sender},
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
@@ -38,7 +46,8 @@ enum WorkingArea {
 }
 
 struct App<'a> {
-    connection: Connection,
+    dbus_rx: Receiver<AppMessage>,
+    dbus_handle: DbusActorHandle,
     services: StatefulList<OwnedBusName>,
     interfaces: Option<Node>,
     objects: StatefulTree<'a>,
@@ -52,9 +61,10 @@ struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    fn new(connection: Connection) -> App<'a> {
+    fn new(dbus_rx: Receiver<AppMessage>, dbus_handle: DbusActorHandle) -> App<'a> {
         App {
-            connection: connection,
+            dbus_rx: dbus_rx,
+            dbus_handle: dbus_handle,
             services: StatefulList::with_items(vec![]),
             interfaces: None,
             objects: StatefulTree::new(),
@@ -63,54 +73,6 @@ impl<'a> App<'a> {
     }
 
     fn on_tick(&self) {}
-
-    async fn get_interfaces_as_tree(
-        &self,
-        busname: &OwnedBusName,
-        path: &ObjectPath<'_>,
-    ) -> Result<StatefulTree<'a>, zbus::Error> {
-        let interfaces = self.get_interfaces(busname, path).await?;
-        Ok(StatefulTree::new())
-    }
-
-    async fn get_services(&self) -> Result<Vec<OwnedBusName>, zbus::fdo::Error> {
-        let dbusproxy = DBusProxy::new(&self.connection).await?;
-        dbusproxy.list_names().await
-    }
-
-    //If this takes a path as well, it can call itself recursively and fill up its nodes
-    async fn get_interfaces(
-        &self,
-        busname: &OwnedBusName,
-        path: &ObjectPath<'_>,
-    ) -> Result<Node, zbus::Error> {
-        let introspectable_proxy = zbus::fdo::IntrospectableProxy::builder(&self.connection)
-            .destination(busname)?
-            .path(path)?
-            .build()
-            .await?;
-
-        let introspect_xml = introspectable_proxy.introspect().await?;
-        Node::from_str(&introspect_xml)
-    }
-
-    async fn get_objects(
-        &self,
-        busname: &OwnedBusName,
-    ) -> Result<
-        HashMap<
-            OwnedObjectPath,
-            HashMap<OwnedInterfaceName, HashMap<std::string::String, OwnedValue>>,
-        >,
-        zbus::fdo::Error,
-    > {
-        let object_manager = zbus::fdo::ObjectManagerProxy::builder(&self.connection)
-            .destination(busname)?
-            .path("/")?
-            .build()
-            .await?;
-        object_manager.get_managed_objects().await
-    }
 }
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -123,10 +85,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // create app and run it
     let tick_rate = Duration::from_millis(250);
-    let connection = Connection::session().await?;
-    let app = App::new(connection);
-    let res = run_app(&mut terminal, app, tick_rate).await;
+    let connection = Connection::system().await?;
 
+    let (dbus_handler_sender, app_receiver) = mpsc::channel::<AppMessage>(16);
+    let dbus_handler = DbusActorHandle::new(dbus_handler_sender, connection);
+    let app = App::new(app_receiver, dbus_handler);
+    let res = run_app(&mut terminal, app, tick_rate).await;
     // restore terminal
     disable_raw_mode()?;
     execute!(
@@ -149,10 +113,22 @@ async fn run_app<B: Backend>(
     tick_rate: Duration,
 ) -> Result<(), zbus::Error> {
     let mut last_tick = Instant::now();
-    app.services = StatefulList::with_items(app.get_services().await?);
+    app.dbus_handle.request_services().await;
+
     loop {
         terminal.draw(|frame| ui(frame, &mut app))?;
 
+        match app.dbus_rx.try_recv() {
+            Ok(message) => match message {
+                AppMessage::Objects(object) => {
+                    app.interfaces = Some(object);
+                }
+                AppMessage::Services(names) => {
+                    app.services = StatefulList::with_items(names);
+                }
+            },
+            Error => (),
+        };
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
@@ -162,26 +138,26 @@ async fn run_app<B: Backend>(
                     KeyCode::Char('q') => return Ok(()),
                     KeyCode::Enter => {
                         if let Some(selected_index) = app.services.state.selected() {
-                            let timeout_duration = Duration::from_secs(1);
                             let item = app.services.items[selected_index].clone();
-                            if let Ok(objects) =
-                                tokio::time::timeout(timeout_duration, app.get_objects(&item)).await
-                            {
+                            app.dbus_handle.request_objects_from(item).await;
+                            // if let Ok(objects) =
+                            //     tokio::time::timeout(timeout_duration, app.get_objects(&item)).await
+                            // {
 
-                                // app.objects = StatefulTree::with_items(objects.unwrap());
-                                //app.objects = Some(timeout.unwrap_or_default());
-                            }
-                            if let Ok(timeout) = tokio::time::timeout(
-                                timeout_duration,
-                                app.get_interfaces(
-                                    &item,
-                                    &ObjectPath::try_from("/").unwrap_or_default(),
-                                ),
-                            )
-                            .await
-                            {
-                                app.interfaces = timeout.ok();
-                            }
+                            //     // app.objects = StatefulTree::with_items(objects.unwrap());
+                            //     //app.objects = Some(timeout.unwrap_or_default());
+                            // }
+                            // if let Ok(timeout) = tokio::time::timeout(
+                            //     timeout_duration,
+                            //     app.get_interfaces(
+                            //         &item,
+                            //         &ObjectPath::try_from("/").unwrap_or_default(),
+                            //     ),
+                            // )
+                            // .await
+                            // {
+                            //     app.interfaces = timeout.ok();
+                            // }
                         }
                     }
                     KeyCode::Left => match app.working_area {
@@ -261,24 +237,24 @@ fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
                 .collect::<Vec<String>>()
                 .join("\n")
         });
-    // let objects_view = Paragraph::new(objects)
-    //     .style(Style::default())
-    //     .block(Block::default().borders(Borders::ALL).title("Objects"))
-    //     .alignment(tui::layout::Alignment::Left)
-    //     .wrap(tui::widgets::Wrap { trim: true });
-    let objects_view = Tree::new(app.objects.items.clone())
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(format!("Tree Widget {:?}", app.objects.state)),
-        )
-        .highlight_style(
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::LightGreen)
-                .add_modifier(Modifier::BOLD),
-        )
-        .highlight_symbol(">> ");
-    frame.render_stateful_widget(objects_view, chunks[1], &mut app.objects.state);
-    //frame.render_widget(objects_view, chunks[1]);
+    let objects_view = Paragraph::new(objects)
+        .style(Style::default())
+        .block(Block::default().borders(Borders::ALL).title("Objects"))
+        .alignment(tui::layout::Alignment::Left)
+        .wrap(tui::widgets::Wrap { trim: true });
+    // let objects_view = Tree::new(app.objects.items.clone())
+    //     .block(
+    //         Block::default()
+    //             .borders(Borders::ALL)
+    //             .title(format!("Tree Widget {:?}", app.objects.state)),
+    //     )
+    //     .highlight_style(
+    //         Style::default()
+    //             .fg(Color::Black)
+    //             .bg(Color::LightGreen)
+    //             .add_modifier(Modifier::BOLD),
+    //     )
+    //     .highlight_symbol(">> ");
+    // frame.render_stateful_widget(objects_view, chunks[1], &mut app.objects.state);
+    frame.render_widget(objects_view, chunks[1]);
 }
