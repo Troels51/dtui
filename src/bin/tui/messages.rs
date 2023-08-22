@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use zbus::{names::OwnedBusName, xml::Node};
 
 pub enum DbusMessage {
@@ -5,6 +7,6 @@ pub enum DbusMessage {
     ServiceRequest(),
 }
 pub enum AppMessage {
-    Objects(Node),
+    Objects(HashMap<String, Node>),
     Services(Vec<OwnedBusName>),
 }

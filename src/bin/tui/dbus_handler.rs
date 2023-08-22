@@ -1,5 +1,6 @@
-use std::str::FromStr;
+use std::{str::FromStr, collections::HashMap};
 
+use async_recursion::async_recursion;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use zbus::{Connection, names::OwnedBusName, xml::Node, zvariant::ObjectPath};
 
@@ -22,9 +23,8 @@ impl DbusActor {
             connection: connection,
         }
     }
-    async fn get_objects(&self, service_name: OwnedBusName) -> Result<Node, zbus::Error> {
-        let path_name = "/".to_string();
-        let path = ObjectPath::try_from(path_name)?;
+    async fn get_node<'a>(&self, service_name: &OwnedBusName, path: &ObjectPath<'a>) -> Result<Node, zbus::Error> {
+
         let introspectable_proxy = zbus::fdo::IntrospectableProxy::builder(&self.connection)
             .destination(service_name)?
             .path(path.clone())?
@@ -34,12 +34,34 @@ impl DbusActor {
         let introspect = Node::from_str(&introspect_xml)?;
         Ok(introspect)
     }
+    #[async_recursion]
+    async fn get_sub_nodes(&self, service_name: &OwnedBusName, path: &ObjectPath<'async_recursion>) -> Result<HashMap<String, Node>, zbus::Error> {
+        let mut result = HashMap::new();
+        let node = self.get_node(service_name, &path).await?;
+
+        for sub_node in node.nodes() {
+            if let Some(name) = sub_node.name() {
+                let path_name = if path.as_str().ends_with('/') {
+                    path.as_str().to_string() + name
+                } else {
+                    path.as_str().to_string() + "/" + name
+                };
+                let sub_path = ObjectPath::try_from(path_name)?;
+                result.extend(self.get_sub_nodes(service_name, &sub_path).await?)
+            }
+        }
+        result.insert(path.to_string(), node);
+        Ok(result)
+    }
+
     pub async fn handle_message(&mut self, msg: DbusMessage) {
         match msg {
-            DbusMessage::GetObjects(path) => {
-                if let Ok(objects) = self.get_objects(path).await {
+            DbusMessage::GetObjects(service_name) => {
+                let path_name = "/".to_string();
+                let path = ObjectPath::try_from(path_name).expect("/ is always a valid path");
+                if let Ok(nodes) = self.get_sub_nodes(&service_name, &path).await {
                     self.app_sender
-                        .send(AppMessage::Objects(objects))
+                        .send(AppMessage::Objects(nodes))
                         .await
                         .expect("channel dead");
                 }

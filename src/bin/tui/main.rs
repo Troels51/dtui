@@ -120,8 +120,8 @@ async fn run_app<B: Backend>(
 
         match app.dbus_rx.try_recv() {
             Ok(message) => match message {
-                AppMessage::Objects(object) => {
-                    app.interfaces = Some(object);
+                AppMessage::Objects(nodes) => {
+                    app.interfaces = nodes.get("/").cloned();
                 }
                 AppMessage::Services(names) => {
                     app.services = StatefulList::with_items(names);
