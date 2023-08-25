@@ -14,3 +14,4 @@ crossterm = "0.26"
 rand = "0.8"
 tokio = { version = "1.32", features = ["full"] }
 async-recursion = "1.0.4"
+itertools = "0.11.0"

@@ -9,6 +9,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use dbus_handler::{DbusActor, DbusActorHandle};
+use itertools::Itertools;
 use messages::{AppMessage, DbusMessage};
 use stateful_list::StatefulList;
 use stateful_tree::StatefulTree;
@@ -25,21 +26,21 @@ use tokio::{
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
-    layout::{Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::Spans,
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    text::{Span, Spans},
+    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
 use tui_tree_widget::{Tree, TreeItem};
 use zbus::{
-    fdo::DBusProxy,
+    fdo::{DBusProxy, Properties},
     names::{OwnedBusName, OwnedInterfaceName},
     xml::Node,
     zvariant::{ObjectPath, OwnedObjectPath, OwnedValue},
     Connection,
 };
-
+#[derive(PartialEq)]
 enum WorkingArea {
     Services,
     Objects,
@@ -49,14 +50,8 @@ struct App<'a> {
     dbus_rx: Receiver<AppMessage>,
     dbus_handle: DbusActorHandle,
     services: StatefulList<OwnedBusName>,
-    interfaces: Option<Node>,
     objects: StatefulTree<'a>,
-    // objects: Option<
-    //     HashMap<
-    //         OwnedObjectPath,
-    //         HashMap<OwnedInterfaceName, HashMap<std::string::String, OwnedValue>>,
-    //     >,
-    // >,
+
     working_area: WorkingArea,
 }
 
@@ -66,7 +61,6 @@ impl<'a> App<'a> {
             dbus_rx: dbus_rx,
             dbus_handle: dbus_handle,
             services: StatefulList::with_items(vec![]),
-            interfaces: None,
             objects: StatefulTree::new(),
             working_area: WorkingArea::Services,
         }
@@ -121,7 +115,64 @@ async fn run_app<B: Backend>(
         match app.dbus_rx.try_recv() {
             Ok(message) => match message {
                 AppMessage::Objects(nodes) => {
-                    app.interfaces = nodes.get("/").cloned();
+                    app.objects = StatefulTree::with_items(
+                        nodes
+                            .iter()
+                            .map(|(object_name, node)| {
+                                let children: Vec<TreeItem> = node
+                                    .interfaces()
+                                    .iter()
+                                    .map(|interface| {
+                                        let methods: Vec<TreeItem> = interface
+                                            .methods()
+                                            .iter()
+                                            .map(|method| {
+                                                TreeItem::new_leaf(method.name().to_string())
+                                            })
+                                            .collect();
+                                        let properties: Vec<TreeItem> = interface
+                                            .properties()
+                                            .iter()
+                                            .map(|property| {
+                                                TreeItem::new_leaf(property.name().to_string())
+                                            })
+                                            .collect();
+                                        let signals: Vec<TreeItem> = interface
+                                            .signals()
+                                            .iter()
+                                            .map(|signal| {
+                                                TreeItem::new_leaf(signal.name().to_string())
+                                            })
+                                            .collect();
+                                        let annotations: Vec<TreeItem> = interface
+                                            .annotations()
+                                            .iter()
+                                            .map(|annotation| {
+                                                TreeItem::new_leaf(annotation.name().to_string())
+                                            })
+                                            .collect();
+                                        let methods_tree = TreeItem::new("Methods", methods);
+                                        let properties_tree =
+                                            TreeItem::new("Properties", properties);
+                                        let signals_tree = TreeItem::new("Signals", signals);
+                                        let annotations_tree =
+                                            TreeItem::new("Annotations", annotations);
+
+                                        TreeItem::new(
+                                            interface.name().to_string(),
+                                            vec![
+                                                methods_tree,
+                                                properties_tree,
+                                                signals_tree,
+                                                annotations_tree,
+                                            ],
+                                        )
+                                    })
+                                    .collect();
+                                TreeItem::new(object_name.clone(), children)
+                            })
+                            .collect(),
+                    );
                 }
                 AppMessage::Services(names) => {
                     app.services = StatefulList::with_items(names);
@@ -140,24 +191,6 @@ async fn run_app<B: Backend>(
                         if let Some(selected_index) = app.services.state.selected() {
                             let item = app.services.items[selected_index].clone();
                             app.dbus_handle.request_objects_from(item).await;
-                            // if let Ok(objects) =
-                            //     tokio::time::timeout(timeout_duration, app.get_objects(&item)).await
-                            // {
-
-                            //     // app.objects = StatefulTree::with_items(objects.unwrap());
-                            //     //app.objects = Some(timeout.unwrap_or_default());
-                            // }
-                            // if let Ok(timeout) = tokio::time::timeout(
-                            //     timeout_duration,
-                            //     app.get_interfaces(
-                            //         &item,
-                            //         &ObjectPath::try_from("/").unwrap_or_default(),
-                            //     ),
-                            // )
-                            // .await
-                            // {
-                            //     app.interfaces = timeout.ok();
-                            // }
                         }
                     }
                     KeyCode::Left => match app.working_area {
@@ -186,15 +219,32 @@ async fn run_app<B: Backend>(
         }
     }
 }
-
+fn working_area_border(app: &App, working_area: WorkingArea) -> Color {
+    if app.working_area == working_area {
+        Color::LightBlue
+    } else {
+        Color::White
+    }
+}
 fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
     // Create two chunks with equal horizontal screen space
+    let full = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(5),
+            Constraint::Max(2)
+        ])
+        .split(frame.size());
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-        .split(frame.size());
-
-    // Iterate through all elements in the `items` app and append some debug text to it.
+        .constraints(
+            [
+                Constraint::Percentage(25),
+                Constraint::Percentage(75),
+            ]
+            .as_ref(),
+        )
+        .split(full[0]);
     let items: Vec<ListItem> = app
         .services
         .items
@@ -207,54 +257,38 @@ fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
 
     // Create a List from all list items and highlight the currently selected one
     let items = List::new(items)
-        .block(Block::default().borders(Borders::ALL).title("Services"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Services")
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(working_area_border(app, WorkingArea::Services))),
+        )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
 
     // We can now render the item list
     frame.render_stateful_widget(items, chunks[0], &mut app.services.state);
 
-    let objects: String = app
-        .interfaces
-        .as_ref()
-        .map_or("Nothing".to_string(), |node| {
-            node.nodes()
-                .into_iter()
-                .map(|node| {
-                    let mut description = String::new();
-                    if let Some(name) = node.name() {
-                        description.push('/');
-                        description.push_str(name);
-                        description.push('\n');
-                    }
-                    description.push('\t');
-                    node.interfaces()
-                        .into_iter()
-                        .fold(description, |acc, interface| {
-                            acc + interface.methods()[0].name() + "\n"
-                        })
-                })
-                .collect::<Vec<String>>()
-                .join("\n")
-        });
-    let objects_view = Paragraph::new(objects)
-        .style(Style::default())
-        .block(Block::default().borders(Borders::ALL).title("Objects"))
-        .alignment(tui::layout::Alignment::Left)
-        .wrap(tui::widgets::Wrap { trim: true });
-    // let objects_view = Tree::new(app.objects.items.clone())
-    //     .block(
-    //         Block::default()
-    //             .borders(Borders::ALL)
-    //             .title(format!("Tree Widget {:?}", app.objects.state)),
-    //     )
-    //     .highlight_style(
-    //         Style::default()
-    //             .fg(Color::Black)
-    //             .bg(Color::LightGreen)
-    //             .add_modifier(Modifier::BOLD),
-    //     )
-    //     .highlight_symbol(">> ");
-    // frame.render_stateful_widget(objects_view, chunks[1], &mut app.objects.state);
-    frame.render_widget(objects_view, chunks[1]);
+    let objects_view = Tree::new(app.objects.items.clone())
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(working_area_border(app, WorkingArea::Objects)))
+                .title("Objects"),
+        )
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::LightGreen)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol(">> ");
+    frame.render_stateful_widget(objects_view, chunks[1], &mut app.objects.state);
+    let bottom_text = vec![
+        Spans::from(Span::raw("Navigation: ← ↓ ↑ →, Query Service: Enter, Quit: q")),
+    ];
+    let helper_paragraph = Paragraph::new(bottom_text).alignment(Alignment::Center);
+    frame.render_widget(helper_paragraph, full[1]);
 }

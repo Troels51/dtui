@@ -1,8 +1,8 @@
-use std::{str::FromStr, collections::HashMap};
+use std::{collections::HashMap, str::FromStr};
 
 use async_recursion::async_recursion;
 use tokio::sync::mpsc::{self, Receiver, Sender};
-use zbus::{Connection, names::OwnedBusName, xml::Node, zvariant::ObjectPath};
+use zbus::{names::OwnedBusName, xml::Node, zvariant::ObjectPath, Connection};
 
 use crate::messages::{AppMessage, DbusMessage};
 
@@ -23,8 +23,11 @@ impl DbusActor {
             connection: connection,
         }
     }
-    async fn get_node<'a>(&self, service_name: &OwnedBusName, path: &ObjectPath<'a>) -> Result<Node, zbus::Error> {
-
+    async fn get_node<'a>(
+        &self,
+        service_name: &OwnedBusName,
+        path: &ObjectPath<'a>,
+    ) -> Result<Node, zbus::Error> {
         let introspectable_proxy = zbus::fdo::IntrospectableProxy::builder(&self.connection)
             .destination(service_name)?
             .path(path.clone())?
@@ -35,7 +38,11 @@ impl DbusActor {
         Ok(introspect)
     }
     #[async_recursion]
-    async fn get_sub_nodes(&self, service_name: &OwnedBusName, path: &ObjectPath<'async_recursion>) -> Result<HashMap<String, Node>, zbus::Error> {
+    async fn get_sub_nodes(
+        &self,
+        service_name: &OwnedBusName,
+        path: &ObjectPath<'async_recursion>,
+    ) -> Result<HashMap<String, Node>, zbus::Error> {
         let mut result = HashMap::new();
         let node = self.get_node(service_name, &path).await?;
 
