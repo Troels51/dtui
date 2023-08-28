@@ -5,7 +5,7 @@ use itertools::Itertools;
 use tokio::sync::mpsc::Receiver;
 use tui::{backend::Backend, Terminal};
 use tui_tree_widget::TreeItem;
-use zbus::{names::OwnedBusName, xml::Annotation};
+use zbus::names::OwnedBusName;
 
 use crate::{
     dbus_handler::DbusActorHandle, messages::AppMessage, stateful_list::StatefulList,
@@ -58,7 +58,7 @@ pub async fn run_app<B: Backend>(
                     app.objects = StatefulTree::with_items(
                         nodes
                             .iter()
-                            .sorted_by(| a,b | a.0.cmp(b.0))
+                            .sorted_by(|a, b| a.0.cmp(b.0))
                             .map(|(object_name, node)| {
                                 let children: Vec<TreeItem> = node
                                     .interfaces()
@@ -68,18 +68,43 @@ pub async fn run_app<B: Backend>(
                                             .methods()
                                             .iter()
                                             .map(|method| {
-                                                let inputs: Vec<String> = method.args().iter()
-                                                    .filter(|arg| arg.direction().unwrap_or_default() == "in")
+                                                let inputs: Vec<String> = method
+                                                    .args()
+                                                    .iter()
+                                                    .filter(|arg| {
+                                                        arg.direction().unwrap_or_default() == "in"
+                                                    })
                                                     .map(|arg| {
-                                                        format!("{}: {}", arg.name().unwrap_or_default(), arg.ty())
-                                                    }).collect();
-                                                let outputs: Vec<String> = method.args().iter()
-                                                    .filter(|arg| arg.direction().unwrap_or_default() == "out")
+                                                        format!(
+                                                            "{}: {}",
+                                                            arg.name().unwrap_or_default(),
+                                                            arg.ty()
+                                                        )
+                                                    })
+                                                    .collect();
+                                                let outputs: Vec<String> = method
+                                                    .args()
+                                                    .iter()
+                                                    .filter(|arg| {
+                                                        arg.direction().unwrap_or_default() == "out"
+                                                    })
                                                     .map(|arg| {
-                                                        format!("{}: {}", arg.name().unwrap_or_default(), arg.ty())
-                                                    }).collect();
-                                                let return_arrow = if outputs.is_empty() { "" } else { "=>" }; // If we dont return anything, the arrow shouldnt be there
-                                                let leaf_string : String = format!("{}({}) {} {}", method.name().to_string(), inputs.join(", "), return_arrow ,outputs.join(", "));
+                                                        format!(
+                                                            "{}: {}",
+                                                            arg.name().unwrap_or_default(),
+                                                            arg.ty()
+                                                        )
+                                                    })
+                                                    .collect();
+                                                let return_arrow =
+                                                    if outputs.is_empty() { "" } else { "=>" }; // If we dont return anything, the arrow shouldnt be there
+                                                let leaf_string: String = format!(
+                                                    "{}({}) {} {}",
+                                                    method.name(),
+                                                    inputs.join(", "),
+                                                    return_arrow,
+                                                    outputs.join(", ")
+                                                );
                                                 TreeItem::new_leaf(leaf_string)
                                             })
                                             .collect();
@@ -87,7 +112,11 @@ pub async fn run_app<B: Backend>(
                                             .properties()
                                             .iter()
                                             .map(|property| {
-                                                TreeItem::new_leaf(format!("{}: {}", property.name().to_string(), property.ty()))
+                                                TreeItem::new_leaf(format!(
+                                                    "{}: {}",
+                                                    property.name(),
+                                                    property.ty()
+                                                ))
                                             })
                                             .collect();
                                         let signals: Vec<TreeItem> = interface
@@ -95,12 +124,25 @@ pub async fn run_app<B: Backend>(
                                             .iter()
                                             .map(|signal| {
                                                 // Signals can only have input parameters
-                                                let inputs: Vec<String> = signal.args().iter()
-                                                    .filter(|arg| arg.direction().unwrap_or_default() == "in")
+                                                let inputs: Vec<String> = signal
+                                                    .args()
+                                                    .iter()
+                                                    .filter(|arg| {
+                                                        arg.direction().unwrap_or_default() == "in"
+                                                    })
                                                     .map(|arg| {
-                                                        format!("{}: {}", arg.name().unwrap_or_default(), arg.ty())
-                                                    }).collect();
-                                                let leaf_string : String = format!("{}({})", signal.name().to_string(), inputs.join(", "));
+                                                        format!(
+                                                            "{}: {}",
+                                                            arg.name().unwrap_or_default(),
+                                                            arg.ty()
+                                                        )
+                                                    })
+                                                    .collect();
+                                                let leaf_string: String = format!(
+                                                    "{}({})",
+                                                    signal.name(),
+                                                    inputs.join(", ")
+                                                );
                                                 TreeItem::new_leaf(leaf_string)
                                             })
                                             .collect();
@@ -153,11 +195,11 @@ pub async fn run_app<B: Backend>(
                                 let item = app.services.items[selected_index].clone();
                                 app.dbus_handle.request_objects_from(item).await;
                             }
-                        },
+                        }
                         WorkingArea::Objects => {
                             //TOTO
                         }
-                    }
+                    },
                     KeyCode::Left => match app.working_area {
                         WorkingArea::Services => app.services.unselect(),
                         WorkingArea::Objects => app.objects.left(),
@@ -171,13 +213,13 @@ pub async fn run_app<B: Backend>(
                         WorkingArea::Objects => app.objects.up(),
                     },
                     KeyCode::Right => match app.working_area {
-                        WorkingArea::Services => {},
+                        WorkingArea::Services => {}
                         WorkingArea::Objects => app.objects.right(),
                     },
                     KeyCode::Tab => match app.working_area {
                         WorkingArea::Services => app.working_area = WorkingArea::Objects,
                         WorkingArea::Objects => app.working_area = WorkingArea::Services,
-                    }
+                    },
                     _ => (),
                 }
             }

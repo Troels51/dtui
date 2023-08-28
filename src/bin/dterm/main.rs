@@ -6,7 +6,7 @@ pub mod stateful_tree;
 pub mod ui;
 
 use app::{run_app, App};
-use clap::{Parser, command, ValueEnum};
+use clap::{command, Parser, ValueEnum};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
@@ -25,7 +25,6 @@ use tui::{
 
 use zbus::Connection;
 
-
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum BusType {
     System,
@@ -42,7 +41,6 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-
     let args = Args::parse();
     // setup terminal
     enable_raw_mode()?;

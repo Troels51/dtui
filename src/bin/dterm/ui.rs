@@ -61,10 +61,7 @@ pub fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
                 .border_style(Style::default().fg(working_area_border(app, WorkingArea::Objects)))
                 .title("Objects"),
         )
-        .highlight_style(
-            Style::default()
-                .add_modifier(Modifier::BOLD),
-        )
+        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
     frame.render_stateful_widget(objects_view, chunks[1], &mut app.objects.state);
     let bottom_text = vec![Spans::from(Span::raw(
