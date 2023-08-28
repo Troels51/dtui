@@ -3,7 +3,7 @@ use std::str::FromStr;
 use async_recursion::async_recursion;
 use zbus::fdo::DBusProxy;
 use zbus::names::OwnedBusName;
-use zbus::xml::{Node};
+use zbus::xml::Node;
 use zbus::zvariant::ObjectPath;
 use zbus::{Connection, Result};
 

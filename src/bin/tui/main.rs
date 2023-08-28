@@ -8,9 +8,9 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use dbus_handler::{DbusActorHandle};
+use dbus_handler::DbusActorHandle;
 
-use messages::{AppMessage};
+use messages::AppMessage;
 use stateful_list::StatefulList;
 use stateful_tree::StatefulTree;
 use std::{
@@ -18,9 +18,7 @@ use std::{
     io,
     time::{Duration, Instant},
 };
-use tokio::{
-    sync::mpsc::{self, Receiver},
-};
+use tokio::sync::mpsc::{self, Receiver};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
@@ -30,10 +28,7 @@ use tui::{
     Frame, Terminal,
 };
 use tui_tree_widget::{Tree, TreeItem};
-use zbus::{
-    names::{OwnedBusName},
-    Connection,
-};
+use zbus::{names::OwnedBusName, Connection};
 #[derive(PartialEq)]
 enum WorkingArea {
     Services,
@@ -224,20 +219,11 @@ fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
     // Create two chunks with equal horizontal screen space
     let full = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(5),
-            Constraint::Max(2)
-        ])
+        .constraints([Constraint::Min(5), Constraint::Max(2)])
         .split(frame.size());
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Percentage(25),
-                Constraint::Percentage(75),
-            ]
-            .as_ref(),
-        )
+        .constraints([Constraint::Percentage(25), Constraint::Percentage(75)].as_ref())
         .split(full[0]);
     let items: Vec<ListItem> = app
         .services
@@ -280,9 +266,9 @@ fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
         )
         .highlight_symbol(">> ");
     frame.render_stateful_widget(objects_view, chunks[1], &mut app.objects.state);
-    let bottom_text = vec![
-        Spans::from(Span::raw("Navigation: ← ↓ ↑ →, Query Service: Enter, Quit: q")),
-    ];
+    let bottom_text = vec![Spans::from(Span::raw(
+        "Navigation: ← ↓ ↑ →, Query Service: Enter, Quit: q",
+    ))];
     let helper_paragraph = Paragraph::new(bottom_text).alignment(Alignment::Center);
     frame.render_widget(helper_paragraph, full[1]);
 }
