@@ -63,8 +63,6 @@ pub fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
         )
         .highlight_style(
             Style::default()
-                .fg(Color::Black)
-                .bg(Color::LightGreen)
                 .add_modifier(Modifier::BOLD),
         )
         .highlight_symbol(">> ");

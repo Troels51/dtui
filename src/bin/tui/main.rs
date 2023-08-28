@@ -35,7 +35,7 @@ enum BusType {
 #[command(author, version, about, long_about = None)]
 struct Args {
     //Which bus to connect to
-    #[clap(default_value_t = BusType::Session)]
+    #[clap(default_value_t = BusType::System)]
     #[arg(value_enum)]
     bus: BusType,
 }

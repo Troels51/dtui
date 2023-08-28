@@ -1,10 +1,11 @@
 use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode};
+use itertools::Itertools;
 use tokio::sync::mpsc::Receiver;
 use tui::{backend::Backend, Terminal};
 use tui_tree_widget::TreeItem;
-use zbus::names::OwnedBusName;
+use zbus::{names::OwnedBusName, xml::Annotation};
 
 use crate::{
     dbus_handler::DbusActorHandle, messages::AppMessage, stateful_list::StatefulList,
@@ -57,6 +58,7 @@ pub async fn run_app<B: Backend>(
                     app.objects = StatefulTree::with_items(
                         nodes
                             .iter()
+                            .sorted_by(| a,b | a.0.cmp(b.0))
                             .map(|(object_name, node)| {
                                 let children: Vec<TreeItem> = node
                                     .interfaces()
@@ -66,44 +68,63 @@ pub async fn run_app<B: Backend>(
                                             .methods()
                                             .iter()
                                             .map(|method| {
-                                                TreeItem::new_leaf(method.name().to_string())
+                                                let inputs: Vec<String> = method.args().iter()
+                                                    .filter(|arg| arg.direction().unwrap_or_default() == "in")
+                                                    .map(|arg| {
+                                                        format!("{}: {}", arg.name().unwrap_or_default(), arg.ty())
+                                                    }).collect();
+                                                let outputs: Vec<String> = method.args().iter()
+                                                    .filter(|arg| arg.direction().unwrap_or_default() == "out")
+                                                    .map(|arg| {
+                                                        format!("{}: {}", arg.name().unwrap_or_default(), arg.ty())
+                                                    }).collect();
+                                                let return_arrow = if outputs.is_empty() { "" } else { "=>" }; // If we dont return anything, the arrow shouldnt be there
+                                                let leaf_string : String = format!("{}({}) {} {}", method.name().to_string(), inputs.join(", "), return_arrow ,outputs.join(", "));
+                                                TreeItem::new_leaf(leaf_string)
                                             })
                                             .collect();
                                         let properties: Vec<TreeItem> = interface
                                             .properties()
                                             .iter()
                                             .map(|property| {
-                                                TreeItem::new_leaf(property.name().to_string())
+                                                TreeItem::new_leaf(format!("{}: {}", property.name().to_string(), property.ty()))
                                             })
                                             .collect();
                                         let signals: Vec<TreeItem> = interface
                                             .signals()
                                             .iter()
                                             .map(|signal| {
-                                                TreeItem::new_leaf(signal.name().to_string())
+                                                // Signals can only have input parameters
+                                                let inputs: Vec<String> = signal.args().iter()
+                                                    .filter(|arg| arg.direction().unwrap_or_default() == "in")
+                                                    .map(|arg| {
+                                                        format!("{}: {}", arg.name().unwrap_or_default(), arg.ty())
+                                                    }).collect();
+                                                let leaf_string : String = format!("{}({})", signal.name().to_string(), inputs.join(", "));
+                                                TreeItem::new_leaf(leaf_string)
                                             })
                                             .collect();
-                                        let annotations: Vec<TreeItem> = interface
-                                            .annotations()
-                                            .iter()
-                                            .map(|annotation| {
-                                                TreeItem::new_leaf(annotation.name().to_string())
-                                            })
-                                            .collect();
+                                        // let annotations: Vec<TreeItem> = interface
+                                        //     .annotations()
+                                        //     .iter()
+                                        //     .map(|annotation| {
+                                        //         TreeItem::new_leaf(annotation.name().to_string())
+                                        //     })
+                                        //     .collect();
                                         let methods_tree = TreeItem::new("Methods", methods);
                                         let properties_tree =
                                             TreeItem::new("Properties", properties);
                                         let signals_tree = TreeItem::new("Signals", signals);
-                                        let annotations_tree =
-                                            TreeItem::new("Annotations", annotations);
-
+                                        // let annotations_tree =
+                                        //     TreeItem::new("Annotations", annotations);
+                                        // TODO: Annotations are used differently, so i dont want to waste space with it
                                         TreeItem::new(
                                             interface.name().to_string(),
                                             vec![
                                                 methods_tree,
                                                 properties_tree,
                                                 signals_tree,
-                                                annotations_tree,
+                                                // annotations_tree,
                                             ],
                                         )
                                     })
