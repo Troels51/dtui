@@ -18,9 +18,9 @@ impl DbusActor {
         connection: Connection,
     ) -> Self {
         Self {
-            app_sender: app_sender,
-            app_receiver: app_receiver,
-            connection: connection,
+            app_sender,
+            app_receiver,
+            connection,
         }
     }
     async fn get_node<'a>(
@@ -44,7 +44,7 @@ impl DbusActor {
         path: &ObjectPath<'async_recursion>,
     ) -> Result<HashMap<String, Node>, zbus::Error> {
         let mut result = HashMap::new();
-        let node = self.get_node(service_name, &path).await?;
+        let node = self.get_node(service_name, path).await?;
 
         for sub_node in node.nodes() {
             if let Some(name) = sub_node.name() {

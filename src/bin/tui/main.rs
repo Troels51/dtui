@@ -8,36 +8,30 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use dbus_handler::{DbusActor, DbusActorHandle};
-use itertools::Itertools;
-use messages::{AppMessage, DbusMessage};
+use dbus_handler::{DbusActorHandle};
+
+use messages::{AppMessage};
 use stateful_list::StatefulList;
 use stateful_tree::StatefulTree;
 use std::{
-    collections::HashMap,
     error::Error,
-    io, path,
-    str::FromStr,
+    io,
     time::{Duration, Instant},
 };
 use tokio::{
-    select,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::mpsc::{self, Receiver},
 };
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Paragraph},
+    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
     Frame, Terminal,
 };
 use tui_tree_widget::{Tree, TreeItem};
 use zbus::{
-    fdo::{DBusProxy, Properties},
-    names::{OwnedBusName, OwnedInterfaceName},
-    xml::Node,
-    zvariant::{ObjectPath, OwnedObjectPath, OwnedValue},
+    names::{OwnedBusName},
     Connection,
 };
 #[derive(PartialEq)]
@@ -58,8 +52,8 @@ struct App<'a> {
 impl<'a> App<'a> {
     fn new(dbus_rx: Receiver<AppMessage>, dbus_handle: DbusActorHandle) -> App<'a> {
         App {
-            dbus_rx: dbus_rx,
-            dbus_handle: dbus_handle,
+            dbus_rx,
+            dbus_handle,
             services: StatefulList::with_items(vec![]),
             objects: StatefulTree::new(),
             working_area: WorkingArea::Services,
@@ -178,7 +172,7 @@ async fn run_app<B: Backend>(
                     app.services = StatefulList::with_items(names);
                 }
             },
-            Error => (),
+            _Error => (),
         };
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())

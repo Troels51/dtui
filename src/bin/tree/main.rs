@@ -3,7 +3,7 @@ use std::str::FromStr;
 use async_recursion::async_recursion;
 use zbus::fdo::DBusProxy;
 use zbus::names::OwnedBusName;
-use zbus::xml::{Interface, Node};
+use zbus::xml::{Node};
 use zbus::zvariant::ObjectPath;
 use zbus::{Connection, Result};
 
@@ -15,7 +15,7 @@ async fn print_all_interfaces(
     indent: usize,
 ) -> std::result::Result<(), zbus::Error> {
     println!("{:indent$}{} ", "", path.as_str(), indent = indent);
-    let introspectable_proxy = zbus::fdo::IntrospectableProxy::builder(&connection)
+    let introspectable_proxy = zbus::fdo::IntrospectableProxy::builder(connection)
         .destination(service)?
         .path(path.clone())?
         .build()
