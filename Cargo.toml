@@ -8,10 +8,9 @@ default-run = "dterm"
 
 [dependencies]
 tui = "0.19"
-tui-tree-widget = "0.11"
-zbus = { version = "3.10", default-features = false, features = ["tokio", "xml"] }
-crossterm = "0.26"
-rand = "0.8"
+tui-tree-widget = "0.12" # We can change to ratatui when tree-widget is in ratatui :)
+zbus = { version = "3.14", default-features = false, features = ["tokio", "xml"] }
+crossterm = "0.27"
 tokio = { version = "1.32", features = ["full"] }
 async-recursion = "1.0.4"
 itertools = "0.11.0"
