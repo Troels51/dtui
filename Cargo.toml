@@ -1,8 +1,13 @@
 [package]
-name = "dbust"
+name = "dterm"
 version = "0.1.0"
 edition = "2021"
 default-run = "dterm"
+authors = ["Troels Hoffmeyer <troels.d.hoffmeyer@gmail.com>"]
+description = "Parser for Rust source code"
+license = "MIT"
+repository = "https://github.com/Troels51/dterm"
+rust-version = "1.56"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
