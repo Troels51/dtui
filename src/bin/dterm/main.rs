@@ -6,7 +6,7 @@ pub mod stateful_tree;
 pub mod ui;
 
 use app::{run_app, App};
-use clap::{command, Parser, ValueEnum, ArgGroup};
+use clap::{command, ArgGroup, Parser, ValueEnum};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
@@ -16,14 +16,14 @@ use dbus_handler::DbusActorHandle;
 
 use messages::AppMessage;
 
-use std::{error::Error, io, time::Duration};
-use tokio::sync::mpsc::{self};
-use tui::{
+use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
 };
+use std::{error::Error, io, time::Duration};
+use tokio::sync::mpsc::{self};
 
-use zbus::{Connection, ConnectionBuilder, Address};
+use zbus::{Connection, ConnectionBuilder};
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum BusType {
@@ -41,13 +41,13 @@ struct Args {
 
     //Address of potentially remote connection
     #[clap(long)]
-    address: Option<String>
-    
+    address: Option<String>,
 }
 
 // This function is mainly used to make error handling nicer, so that we can cleanup the terminal nicely
 async fn run<B>(terminal: &mut Terminal<B>, args: Args) -> Result<(), zbus::Error>
-    where B:Backend
+where
+    B: Backend,
 {
     // create app and run it
     let tick_rate = Duration::from_millis(250);
@@ -56,7 +56,9 @@ async fn run<B>(terminal: &mut Terminal<B>, args: Args) -> Result<(), zbus::Erro
         BusType::Session => Connection::session().await?,
     };
     if let Some(address) = args.address {
-        connection = ConnectionBuilder::address(address.as_str())?.build().await?;
+        connection = ConnectionBuilder::address(address.as_str())?
+            .build()
+            .await?;
     }
     let (dbus_handler_sender, app_receiver) = mpsc::channel::<AppMessage>(16);
     let dbus_handler = DbusActorHandle::new(dbus_handler_sender, connection);
@@ -85,7 +87,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     )?;
     terminal.show_cursor()?;
 
-    if let Err(err) = res { 
+    if let Err(err) = res {
         println!("{}", err);
     }
     Ok(())

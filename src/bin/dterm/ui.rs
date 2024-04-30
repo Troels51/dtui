@@ -1,8 +1,8 @@
-use tui::{
+use ratatui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
+    text::Span,
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
     Frame,
 };
@@ -18,7 +18,7 @@ fn working_area_border(app: &App, working_area: WorkingArea) -> Color {
     }
 }
 
-pub fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
+pub fn ui<B: Backend>(frame: &mut Frame, app: &mut App) {
     // Create two chunks with equal horizontal screen space
     let full = Layout::default()
         .direction(Direction::Vertical)
@@ -33,7 +33,7 @@ pub fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
         .items
         .iter()
         .map(|i| {
-            let lines = vec![Spans::from(i.as_str())];
+            let lines = Span::from(i.as_str());
             ListItem::new(lines).style(Style::default())
         })
         .collect();
@@ -54,6 +54,7 @@ pub fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
     frame.render_stateful_widget(items, chunks[0], &mut app.services.state);
 
     let objects_view = Tree::new(app.objects.items.clone())
+        .unwrap()
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -64,9 +65,9 @@ pub fn ui<B: Backend>(frame: &mut Frame<B>, app: &mut App) {
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
     frame.render_stateful_widget(objects_view, chunks[1], &mut app.objects.state);
-    let bottom_text = vec![Spans::from(Span::raw(
+    let bottom_text = Span::raw(
         "Change focus: Tab | Navigation: ← ↓ ↑ → | Get Service: Enter | Quit: q",
-    ))];
+    );
     let helper_paragraph = Paragraph::new(bottom_text).alignment(Alignment::Center);
     frame.render_widget(helper_paragraph, full[1]);
 }

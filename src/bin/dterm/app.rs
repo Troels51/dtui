@@ -2,8 +2,8 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode};
 use itertools::Itertools;
+use ratatui::{backend::Backend, Terminal};
 use tokio::sync::mpsc::Receiver;
-use tui::{backend::Backend, Terminal};
 use tui_tree_widget::TreeItem;
 use zbus::names::OwnedBusName;
 
@@ -43,14 +43,14 @@ impl<'a> App<'a> {
 
 pub async fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut app: App<'_>,
+    mut app: App<'static>,
     tick_rate: Duration,
 ) -> Result<(), zbus::Error> {
     let mut last_tick = Instant::now();
     app.dbus_handle.request_services().await;
 
     loop {
-        terminal.draw(|frame| ui(frame, &mut app))?;
+        terminal.draw(|frame| ui::<B>(frame, &mut app))?;
 
         match app.dbus_rx.try_recv() {
             Ok(message) => match message {
@@ -59,15 +59,18 @@ pub async fn run_app<B: Backend>(
                         nodes
                             .iter()
                             .sorted_by(|a, b| a.0.cmp(b.0))
-                            .map(|(object_name, node)| {
-                                let children: Vec<TreeItem> = node
+                            .enumerate()
+                            .map(|(id, (object_name, node))| {
+                                let children: Vec<TreeItem<usize>> = node
                                     .interfaces()
                                     .iter()
-                                    .map(|interface| {
-                                        let methods: Vec<TreeItem> = interface
+                                    .enumerate()
+                                    .map(|(id, interface)| {
+                                        let methods: Vec<TreeItem<usize>> = interface
                                             .methods()
                                             .iter()
-                                            .map(|method| {
+                                            .enumerate()
+                                            .map(|(id, method)| {
                                                 let inputs: Vec<String> = method
                                                     .args()
                                                     .iter()
@@ -105,24 +108,29 @@ pub async fn run_app<B: Backend>(
                                                     return_arrow,
                                                     outputs.join(", ")
                                                 );
-                                                TreeItem::new_leaf(leaf_string)
+                                                TreeItem::new_leaf(id, leaf_string)
                                             })
                                             .collect();
-                                        let properties: Vec<TreeItem> = interface
+                                        let properties: Vec<TreeItem<usize>> = interface
                                             .properties()
                                             .iter()
-                                            .map(|property| {
-                                                TreeItem::new_leaf(format!(
-                                                    "{}: {}",
-                                                    property.name(),
-                                                    property.ty()
-                                                ))
+                                            .enumerate()
+                                            .map(|(id, property)| {
+                                                TreeItem::new_leaf(
+                                                    id,
+                                                    format!(
+                                                        "{}: {}",
+                                                        property.name(),
+                                                        property.ty()
+                                                    ),
+                                                )
                                             })
                                             .collect();
-                                        let signals: Vec<TreeItem> = interface
+                                        let signals: Vec<TreeItem<usize>> = interface
                                             .signals()
                                             .iter()
-                                            .map(|signal| {
+                                            .enumerate()
+                                            .map(|(id, signal)| {
                                                 // Signals can only have input parameters
                                                 let inputs: Vec<String> = signal
                                                     .args()
@@ -143,7 +151,7 @@ pub async fn run_app<B: Backend>(
                                                     signal.name(),
                                                     inputs.join(", ")
                                                 );
-                                                TreeItem::new_leaf(leaf_string)
+                                                TreeItem::new_leaf(id, leaf_string)
                                             })
                                             .collect();
                                         // let annotations: Vec<TreeItem> = interface
@@ -153,14 +161,18 @@ pub async fn run_app<B: Backend>(
                                         //         TreeItem::new_leaf(annotation.name().to_string())
                                         //     })
                                         //     .collect();
-                                        let methods_tree = TreeItem::new("Methods", methods);
+                                        let methods_tree = TreeItem::new(0, "Methods", methods)
+                                            .expect("Methods should have different ids");
                                         let properties_tree =
-                                            TreeItem::new("Properties", properties);
-                                        let signals_tree = TreeItem::new("Signals", signals);
+                                            TreeItem::new(1, "Properties", properties)
+                                                .expect("Properties should have different ids");
+                                        let signals_tree = TreeItem::new(2, "Signals", signals)
+                                            .expect("Signals should have different ids");
                                         // let annotations_tree =
                                         //     TreeItem::new("Annotations", annotations);
                                         // TODO: Annotations are used differently, so i dont want to waste space with it
                                         TreeItem::new(
+                                            id,
                                             interface.name().to_string(),
                                             vec![
                                                 methods_tree,
@@ -169,9 +181,10 @@ pub async fn run_app<B: Backend>(
                                                 // annotations_tree,
                                             ],
                                         )
+                                        .unwrap()
                                     })
                                     .collect();
-                                TreeItem::new(object_name.clone(), children)
+                                TreeItem::new(id, object_name.clone(), children).unwrap()
                             })
                             .collect(),
                     );
