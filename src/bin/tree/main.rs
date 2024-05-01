@@ -1,11 +1,11 @@
-use std::str::FromStr;
+use std::io::BufReader;
 
 use async_recursion::async_recursion;
 use zbus::fdo::DBusProxy;
 use zbus::names::OwnedBusName;
-use zbus::xml::Node;
 use zbus::zvariant::ObjectPath;
 use zbus::{Connection, Result};
+use zbus_xml::Node;
 
 #[async_recursion]
 async fn print_all_interfaces(
@@ -21,7 +21,7 @@ async fn print_all_interfaces(
         .build()
         .await?;
     let introspect_xml = introspectable_proxy.introspect().await?;
-    let introspect = Node::from_str(&introspect_xml)?;
+    let introspect = Node::from_reader(BufReader::new(introspect_xml.as_bytes())).unwrap();
     println!("{:indent$}Interfaces: ", "", indent = indent + 4);
     for interface in introspect.interfaces() {
         println!("{:indent$}{} ", "", interface.name(), indent = indent + 8);

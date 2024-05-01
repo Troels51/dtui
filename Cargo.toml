@@ -4,19 +4,19 @@ version = "0.1.0"
 edition = "2021"
 default-run = "dterm"
 authors = ["Troels Hoffmeyer <troels.d.hoffmeyer@gmail.com>"]
-description = "Parser for Rust source code"
+description = "Dbus tui for introspecting your current dbus session/system"
 license = "MIT"
 repository = "https://github.com/Troels51/dterm"
 rust-version = "1.56"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 tui-tree-widget = "0.19"
-zbus = { version = "3.14", default-features = false, features = ["tokio", "xml"] }
+zbus = { version = "4.2", default-features = false, features = ["tokio"] }
 crossterm = "0.27"
 tokio = { version = "1.32", features = ["full"] }
-async-recursion = "1.0.4"
+async-recursion = "1.1.1"
 itertools = "0.11.0"
 clap = { version = "4.4.1", features = ["derive"] }
 ratatui = { version = "0.26.2", features = ["macros"] }
+zbus_xml = "4.0.0"

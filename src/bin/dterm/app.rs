@@ -6,6 +6,7 @@ use ratatui::{backend::Backend, Terminal};
 use tokio::sync::mpsc::Receiver;
 use tui_tree_widget::TreeItem;
 use zbus::names::OwnedBusName;
+use zbus_xml::ArgDirection;
 
 use crate::{
     dbus_handler::DbusActorHandle, messages::AppMessage, stateful_list::StatefulList,
@@ -75,7 +76,8 @@ pub async fn run_app<B: Backend>(
                                                     .args()
                                                     .iter()
                                                     .filter(|arg| {
-                                                        arg.direction().unwrap_or_default() == "in"
+                                                        arg.direction()
+                                                            .is_some_and(|s| s == ArgDirection::In)
                                                     })
                                                     .map(|arg| {
                                                         format!(
@@ -89,7 +91,8 @@ pub async fn run_app<B: Backend>(
                                                     .args()
                                                     .iter()
                                                     .filter(|arg| {
-                                                        arg.direction().unwrap_or_default() == "out"
+                                                        arg.direction()
+                                                            .is_some_and(|s| s == ArgDirection::Out)
                                                     })
                                                     .map(|arg| {
                                                         format!(
@@ -136,7 +139,8 @@ pub async fn run_app<B: Backend>(
                                                     .args()
                                                     .iter()
                                                     .filter(|arg| {
-                                                        arg.direction().unwrap_or_default() == "in"
+                                                        arg.direction()
+                                                            .is_some_and(|s| s == ArgDirection::In)
                                                     })
                                                     .map(|arg| {
                                                         format!(
