@@ -1,8 +1,7 @@
 # dterm
-A small TUI for d-termining the state of you dbus.
-This will show you the current services running and allows you to introspect that service.
+A small TUI for d-termining the state of your dbus.
+It will show you the current services running and allow you to introspect objects and their interfaces in those services
 
-Use Tab to change between the view, arrow keys to navigate the list and tree, and enter to get objects from a service.
 ![Example](/images/dterm.png)
 
 ## Build
