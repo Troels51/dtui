@@ -10,6 +10,10 @@ repository = "https://github.com/Troels51/dterm"
 rust-version = "1.56"
 keywords = ["tui", "dbus"]
 categories = ["command-line-utilities"]
+exclude = [
+    ".github/*",
+    "images/*",
+]
 
 [dependencies]
 tui-tree-widget = "0.19"
