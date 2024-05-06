@@ -1,10 +1,10 @@
 [package]
 name = "dterm"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 default-run = "dterm"
 authors = ["Troels Hoffmeyer <troels.d.hoffmeyer@gmail.com>"]
-description = "Dbus tui for introspecting your current dbus session/system"
+description = "dBus TUI for introspecting your current dbus session/system"
 license = "MIT"
 repository = "https://github.com/Troels51/dterm"
 rust-version = "1.56"
