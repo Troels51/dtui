@@ -1,12 +1,12 @@
 [package]
-name = "dterm"
+name = "dtui"
 version = "1.0.0"
 edition = "2021"
-default-run = "dterm"
+default-run = "dtui"
 authors = ["Troels Hoffmeyer <troels.d.hoffmeyer@gmail.com>"]
 description = "dBus TUI for introspecting your current dbus session/system"
 license = "MIT"
-repository = "https://github.com/Troels51/dterm"
+repository = "https://github.com/Troels51/dtui"
 rust-version = "1.56"
 keywords = ["tui", "dbus"]
 categories = ["command-line-utilities"]

@@ -463,7 +463,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dterm"
+name = "dtui"
 version = "1.0.0"
 dependencies = [
  "async-recursion",
