@@ -65,9 +65,8 @@ pub fn ui<B: Backend>(frame: &mut Frame, app: &mut App) {
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol(">> ");
     frame.render_stateful_widget(objects_view, chunks[1], &mut app.objects.state);
-    let bottom_text = Span::raw(
-        "Change focus: Tab | Navigation: ← ↓ ↑ → | Get Service: Enter | Quit: q",
-    );
+    let bottom_text =
+        Span::raw("Change focus: Tab | Navigation: ← ↓ ↑ → | Get Service: Enter | Quit: q");
     let helper_paragraph = Paragraph::new(bottom_text).alignment(Alignment::Center);
     frame.render_widget(helper_paragraph, full[1]);
 }
