@@ -22,6 +22,9 @@ use ratatui::{
 };
 use std::{error::Error, io, time::Duration};
 use tokio::sync::mpsc::{self};
+use tracing::{level_filters::LevelFilter};
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::{layer::SubscriberExt};
 
 use zbus::{Connection, ConnectionBuilder};
 
@@ -42,6 +45,9 @@ struct Args {
     //Address of potentially remote connection
     #[clap(long)]
     address: Option<String>,
+
+    #[clap(default_value_t = LevelFilter::OFF)]
+    debug_level: LevelFilter,
 }
 
 // This function is mainly used to make error handling nicer, so that we can cleanup the terminal nicely
@@ -66,10 +72,17 @@ where
     let app = App::new(app_receiver, dbus_handler);
     run_app(terminal, app, tick_rate).await
 }
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
+    // Initialize tracing to journald
+    let registry = tracing_subscriber::registry();
+    match tracing_journald::layer() {
+        Ok(layer) => registry.with(layer.with_filter(args.debug_level)).init(),
+        Err(_) => (),
+    }
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;

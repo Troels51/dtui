@@ -8,6 +8,6 @@ pub enum DbusMessage {
     ServiceRequest(),
 }
 pub enum AppMessage {
-    Objects(HashMap<String, Node<'static>>),
+    Objects((OwnedBusName, HashMap<String, Node<'static>>)), // Service name + Map of (Object names, node)
     Services(Vec<OwnedBusName>),
 }

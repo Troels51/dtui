@@ -1,12 +1,10 @@
 use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode};
-use itertools::Itertools;
 use ratatui::{backend::Backend, Terminal};
 use tokio::sync::mpsc::Receiver;
-use tui_tree_widget::TreeItem;
+use tracing::Level;
 use zbus::names::OwnedBusName;
-use zbus_xml::ArgDirection;
 
 use crate::{
     dbus_handler::DbusActorHandle, messages::AppMessage, stateful_list::StatefulList,
@@ -19,17 +17,16 @@ pub enum WorkingArea {
     Objects,
 }
 
-pub struct App<'a> {
+pub struct App {
     dbus_rx: Receiver<AppMessage>,
     dbus_handle: DbusActorHandle,
     pub services: StatefulList<OwnedBusName>,
-    pub objects: StatefulTree<'a>,
-
+    pub objects: StatefulTree,
     pub working_area: WorkingArea,
 }
 
-impl<'a> App<'a> {
-    pub fn new(dbus_rx: Receiver<AppMessage>, dbus_handle: DbusActorHandle) -> App<'a> {
+impl App {
+    pub fn new(dbus_rx: Receiver<AppMessage>, dbus_handle: DbusActorHandle) -> App {
         App {
             dbus_rx,
             dbus_handle,
@@ -44,7 +41,7 @@ impl<'a> App<'a> {
 
 pub async fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
-    mut app: App<'static>,
+    mut app: App,
     tick_rate: Duration,
 ) -> Result<(), zbus::Error> {
     let mut last_tick = Instant::now();
@@ -55,143 +52,8 @@ pub async fn run_app<B: Backend>(
 
         match app.dbus_rx.try_recv() {
             Ok(message) => match message {
-                AppMessage::Objects(nodes) => {
-                    app.objects = StatefulTree::with_items(
-                        nodes
-                            .iter()
-                            .sorted_by(|a, b| a.0.cmp(b.0))
-                            .enumerate()
-                            .map(|(id, (object_name, node))| {
-                                let children: Vec<TreeItem<usize>> = node
-                                    .interfaces()
-                                    .iter()
-                                    .enumerate()
-                                    .map(|(id, interface)| {
-                                        let methods: Vec<TreeItem<usize>> = interface
-                                            .methods()
-                                            .iter()
-                                            .enumerate()
-                                            .map(|(id, method)| {
-                                                let inputs: Vec<String> = method
-                                                    .args()
-                                                    .iter()
-                                                    .filter(|arg| {
-                                                        arg.direction()
-                                                            .is_some_and(|s| s == ArgDirection::In)
-                                                    })
-                                                    .map(|arg| {
-                                                        format!(
-                                                            "{}: {}",
-                                                            arg.name().unwrap_or_default(),
-                                                            arg.ty()
-                                                        )
-                                                    })
-                                                    .collect();
-                                                let outputs: Vec<String> = method
-                                                    .args()
-                                                    .iter()
-                                                    .filter(|arg| {
-                                                        arg.direction()
-                                                            .is_some_and(|s| s == ArgDirection::Out)
-                                                    })
-                                                    .map(|arg| {
-                                                        format!(
-                                                            "{}: {}",
-                                                            arg.name().unwrap_or_default(),
-                                                            arg.ty()
-                                                        )
-                                                    })
-                                                    .collect();
-                                                let return_arrow =
-                                                    if outputs.is_empty() { "" } else { "=>" }; // If we dont return anything, the arrow shouldnt be there
-                                                let leaf_string: String = format!(
-                                                    "{}({}) {} {}",
-                                                    method.name(),
-                                                    inputs.join(", "),
-                                                    return_arrow,
-                                                    outputs.join(", ")
-                                                );
-                                                TreeItem::new_leaf(id, leaf_string)
-                                            })
-                                            .collect();
-                                        let properties: Vec<TreeItem<usize>> = interface
-                                            .properties()
-                                            .iter()
-                                            .enumerate()
-                                            .map(|(id, property)| {
-                                                TreeItem::new_leaf(
-                                                    id,
-                                                    format!(
-                                                        "{}: {}",
-                                                        property.name(),
-                                                        property.ty()
-                                                    ),
-                                                )
-                                            })
-                                            .collect();
-                                        let signals: Vec<TreeItem<usize>> = interface
-                                            .signals()
-                                            .iter()
-                                            .enumerate()
-                                            .map(|(id, signal)| {
-                                                // Signals can only have input parameters
-                                                let inputs: Vec<String> = signal
-                                                    .args()
-                                                    .iter()
-                                                    .filter(|arg| {
-                                                        arg.direction()
-                                                            .is_some_and(|s| s == ArgDirection::In)
-                                                    })
-                                                    .map(|arg| {
-                                                        format!(
-                                                            "{}: {}",
-                                                            arg.name().unwrap_or_default(),
-                                                            arg.ty()
-                                                        )
-                                                    })
-                                                    .collect();
-                                                let leaf_string: String = format!(
-                                                    "{}({})",
-                                                    signal.name(),
-                                                    inputs.join(", ")
-                                                );
-                                                TreeItem::new_leaf(id, leaf_string)
-                                            })
-                                            .collect();
-                                        // let annotations: Vec<TreeItem> = interface
-                                        //     .annotations()
-                                        //     .iter()
-                                        //     .map(|annotation| {
-                                        //         TreeItem::new_leaf(annotation.name().to_string())
-                                        //     })
-                                        //     .collect();
-                                        let methods_tree = TreeItem::new(0, "Methods", methods)
-                                            .expect("Methods should have different ids");
-                                        let properties_tree =
-                                            TreeItem::new(1, "Properties", properties)
-                                                .expect("Properties should have different ids");
-                                        let signals_tree = TreeItem::new(2, "Signals", signals)
-                                            .expect("Signals should have different ids");
-                                        // let annotations_tree =
-                                        //     TreeItem::new("Annotations", annotations);
-                                        // TODO: Annotations are used differently, so i dont want to waste space with it
-                                        TreeItem::new(
-                                            id,
-                                            interface.name().to_string(),
-                                            vec![
-                                                methods_tree,
-                                                properties_tree,
-                                                signals_tree,
-                                                // annotations_tree,
-                                            ],
-                                        )
-                                        .unwrap()
-                                    })
-                                    .collect();
-                                TreeItem::new(id, object_name.clone(), children).unwrap()
-                            })
-                            .collect(),
-                    );
+                AppMessage::Objects((_service_name, root_node)) => {
+                    app.objects = StatefulTree::from_nodes(root_node);
                 }
                 AppMessage::Services(names) => {
                     app.services = StatefulList::with_items(names);
@@ -239,6 +101,11 @@ pub async fn run_app<B: Backend>(
                     },
                     _ => (),
                 }
+                tracing::event!(
+                    Level::DEBUG,
+                    "{}",
+                    format!("state = {:?}", app.objects.state)
+                );
             }
         }
         if last_tick.elapsed() >= tick_rate {

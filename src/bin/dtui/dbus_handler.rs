@@ -36,6 +36,7 @@ impl DbusActor {
             .await?;
         let introspect_xml: String = introspectable_proxy.introspect().await?;
         let introspect = Node::from_reader(BufReader::new(introspect_xml.as_bytes()))?;
+
         Ok(introspect)
     }
 
@@ -45,8 +46,8 @@ impl DbusActor {
         service_name: &OwnedBusName,
         path: &ObjectPath<'async_recursion>,
     ) -> Result<HashMap<String, Node<'static>>, Box<dyn Error + Send + Sync>> {
-        let mut result = HashMap::new();
         let node = self.get_node(service_name, path).await?;
+        let mut result = HashMap::new();
 
         for sub_node in node.nodes() {
             if let Some(name) = sub_node.name() {
@@ -56,7 +57,7 @@ impl DbusActor {
                     path.as_str().to_string() + "/" + name
                 };
                 let sub_path = ObjectPath::try_from(path_name)?;
-                result.extend(self.get_sub_nodes(service_name, &sub_path).await?)
+                result.extend(self.get_sub_nodes(service_name, &sub_path).await?);
             }
         }
         result.insert(path.to_string(), node);
@@ -68,9 +69,10 @@ impl DbusActor {
             DbusMessage::GetObjects(service_name) => {
                 let path_name = "/".to_string();
                 let path = ObjectPath::try_from(path_name).expect("/ is always a valid path");
+
                 if let Ok(nodes) = self.get_sub_nodes(&service_name, &path).await {
                     self.app_sender
-                        .send(AppMessage::Objects(nodes))
+                        .send(AppMessage::Objects((service_name, nodes)))
                         .await
                         .expect("channel dead");
                 }

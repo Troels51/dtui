@@ -25,3 +25,7 @@ itertools = "0.11.0"
 clap = { version = "4.4.1", features = ["derive"] }
 ratatui = { version = "0.26.2", features = ["macros"] }
 zbus_xml = "4.0.0"
+tracing-error = "0.2.0"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "fmt"] }
+tracing-journald = "0.3.0"
