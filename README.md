@@ -8,12 +8,16 @@ It will show you the current services running and allow you to introspect object
 ![Example](/images/dtui.png)
 
 ## Build
+### From Source
 To build install Rust and cargo, then run build
-```
+```sh
 cargo build
 ```
 
 To run from cargo
-```
+```sh
 cargo run --bin dtui
 ```
+
+### ArchLinux
+[AUR dtui package](https://aur.archlinux.org/packages/dtui)
