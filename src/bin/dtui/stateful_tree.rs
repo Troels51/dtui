@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 use tui_tree_widget::{TreeItem, TreeState};
-use zbus_xml::{ArgDirection, Node};
+use zbus::zvariant::{self, CompleteType};
+use zbus_xml::{Arg, ArgDirection, Interface, Method, Node};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MemberTypes {
@@ -17,12 +18,24 @@ pub enum MemberTypes {
 //    > Methods/Properties/Signals (The actual list of the methods)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DbusIdentifier {
-    Object(String),      // ObjectPath
-    Interface(String),   // InterfaceName
-    Member(MemberTypes), // Can be Method, Properties, Signals
-    Method(String),      // zbus_name::MemberName
-    Property(String),    // zbus_name::PropertyName
-    Signal(String),      // zbus_name::MemberName
+    Object(String),            // ObjectPath
+    Interface(String),         // InterfaceName
+    Member(MemberTypes),       // Can be Method, Properties, Signals
+    Method(MethodDescription), // zbus_name::MemberName
+    Property(String),          // zbus_name::PropertyName
+    Signal(String),            // zbus_name::MemberName
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MethodDescription(pub Method<'static>);
+
+// Rely on PartialEq
+impl Eq for MethodDescription {}
+
+impl std::hash::Hash for MethodDescription {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.name().hash(state);
+    }
 }
 
 impl Default for DbusIdentifier {
@@ -31,7 +44,7 @@ impl Default for DbusIdentifier {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct StatefulTree {
     pub state: TreeState<DbusIdentifier>,
     pub items: Vec<TreeItem<'static, DbusIdentifier>>,
@@ -72,11 +85,11 @@ impl StatefulTree {
     }
 
     pub fn down(&mut self) {
-        self.state.key_down(&self.items);
+        self.state.key_down();
     }
 
     pub fn up(&mut self) {
-        self.state.key_up(&self.items);
+        self.state.key_up();
     }
 
     pub fn left(&mut self) {
@@ -92,7 +105,7 @@ impl StatefulTree {
     }
 }
 
-fn node_to_treeitems(node: &zbus_xml::Node) -> Vec<TreeItem<'static, DbusIdentifier>> {
+fn node_to_treeitems(node: &zbus_xml::Node<'static>) -> Vec<TreeItem<'static, DbusIdentifier>> {
     let children: Vec<TreeItem<DbusIdentifier>> = node
         .interfaces()
         .iter()
@@ -100,6 +113,7 @@ fn node_to_treeitems(node: &zbus_xml::Node) -> Vec<TreeItem<'static, DbusIdentif
             let methods: Vec<TreeItem<DbusIdentifier>> = interface
                 .methods()
                 .iter()
+                .cloned()
                 .map(|method| {
                     let inputs: Vec<String> = method
                         .args()
@@ -122,7 +136,7 @@ fn node_to_treeitems(node: &zbus_xml::Node) -> Vec<TreeItem<'static, DbusIdentif
                         outputs.join(", ")
                     );
                     TreeItem::new_leaf(
-                        DbusIdentifier::Method(method.name().to_string()),
+                        DbusIdentifier::Method(MethodDescription(method)),
                         leaf_string,
                     )
                 })

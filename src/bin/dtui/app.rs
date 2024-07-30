@@ -7,14 +7,18 @@ use tracing::Level;
 use zbus::names::OwnedBusName;
 
 use crate::{
-    dbus_handler::DbusActorHandle, messages::AppMessage, stateful_list::StatefulList,
-    stateful_tree::StatefulTree, ui::ui,
+    dbus_handler::DbusActorHandle,
+    messages::AppMessage,
+    stateful_list::StatefulList,
+    stateful_tree::{MethodDescription, StatefulTree},
+    ui::ui,
 };
 
 #[derive(PartialEq)]
 pub enum WorkingArea {
     Services,
     Objects,
+    PopUp(MethodDescription),
 }
 
 pub struct App {
@@ -76,29 +80,51 @@ pub async fn run_app<B: Backend>(
                             }
                         }
                         WorkingArea::Objects => {
-                            //TOTO
+                            if let Some(last) = app.objects.state.selected().last() {
+                                match last {
+                                    crate::stateful_tree::DbusIdentifier::Method(m) => {
+                                        app.working_area = WorkingArea::PopUp(m.clone());
+                                    }
+                                    crate::stateful_tree::DbusIdentifier::Property(p) => {
+                                        // Get the property
+                                    }
+                                    crate::stateful_tree::DbusIdentifier::Signal(s) => {
+                                        // Call the signal
+                                    }
+                                    _ => (),
+                                }
+                            }
                         }
+                        WorkingArea::PopUp(ref _method) => {}
                     },
                     KeyCode::Left => match app.working_area {
                         WorkingArea::Services => app.services.unselect(),
                         WorkingArea::Objects => app.objects.left(),
+                        WorkingArea::PopUp(ref _method) => {}
                     },
                     KeyCode::Down => match app.working_area {
                         WorkingArea::Services => app.services.next(),
                         WorkingArea::Objects => app.objects.down(),
+                        WorkingArea::PopUp(ref _method) => {}
                     },
                     KeyCode::Up => match app.working_area {
                         WorkingArea::Services => app.services.previous(),
                         WorkingArea::Objects => app.objects.up(),
+                        WorkingArea::PopUp(ref _method) => {}
                     },
                     KeyCode::Right => match app.working_area {
                         WorkingArea::Services => {}
                         WorkingArea::Objects => app.objects.right(),
+                        WorkingArea::PopUp(ref _method) => {}
                     },
                     KeyCode::Tab => match app.working_area {
                         WorkingArea::Services => app.working_area = WorkingArea::Objects,
                         WorkingArea::Objects => app.working_area = WorkingArea::Services,
+                        WorkingArea::PopUp(ref _method) => {}
                     },
+                    KeyCode::Esc => {
+                        app.working_area = WorkingArea::Objects;
+                    }
                     _ => (),
                 }
                 tracing::event!(
