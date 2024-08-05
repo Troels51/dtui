@@ -14,13 +14,34 @@ use crate::{
     ui::ui,
 };
 
+pub struct PopUp {
+    pub method_description: MethodDescription,
+    pub inputs: Vec<tui_textarea::TextArea<'static>>,
+    pub selected: usize,
+}
+impl PopUp {
+    fn new(method_description: MethodDescription) -> Self {
+        Self {
+            method_description: method_description,
+            inputs: Vec::new(), // This gets filled on UI. Maybe there is a better way of doing this
+            selected: 0,
+        }
+    }
+}
+
+impl PartialEq for PopUp {
+    fn eq(&self, other: &Self) -> bool {
+        self.method_description == other.method_description
+    }
+}
+
 #[derive(PartialEq)]
 pub enum WorkingArea {
     Services,
     Objects,
-    PopUp(MethodDescription),
+    PopUp(PopUp),
 }
-
+// TODO: maybe we should use Components instead, Objects/Services/PopUp would be a componenet, and they would have their own input/render functions
 pub struct App {
     dbus_rx: Receiver<AppMessage>,
     dbus_handle: DbusActorHandle,
@@ -71,7 +92,11 @@ pub async fn run_app<B: Backend>(
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Char('q') => match app.working_area {
+                        WorkingArea::Services => return Ok(()),
+                        WorkingArea::Objects => return Ok(()),
+                        WorkingArea::PopUp(_) => (),
+                    },
                     KeyCode::Enter => match app.working_area {
                         WorkingArea::Services => {
                             if let Some(selected_index) = app.services.state.selected() {
@@ -83,7 +108,8 @@ pub async fn run_app<B: Backend>(
                             if let Some(last) = app.objects.state.selected().last() {
                                 match last {
                                     crate::stateful_tree::DbusIdentifier::Method(m) => {
-                                        app.working_area = WorkingArea::PopUp(m.clone());
+                                        app.working_area =
+                                            WorkingArea::PopUp(PopUp::new(m.clone()));
                                     }
                                     crate::stateful_tree::DbusIdentifier::Property(p) => {
                                         // Get the property
@@ -100,22 +126,30 @@ pub async fn run_app<B: Backend>(
                     KeyCode::Left => match app.working_area {
                         WorkingArea::Services => app.services.unselect(),
                         WorkingArea::Objects => app.objects.left(),
-                        WorkingArea::PopUp(ref _method) => {}
+                        WorkingArea::PopUp(ref mut popup) => {
+                            popup.inputs[0].input(key);
+                        }
                     },
                     KeyCode::Down => match app.working_area {
                         WorkingArea::Services => app.services.next(),
                         WorkingArea::Objects => app.objects.down(),
-                        WorkingArea::PopUp(ref _method) => {}
+                        WorkingArea::PopUp(ref mut popup) => {
+                            popup.selected = std::cmp::min(popup.selected + 1, popup.inputs.len());
+                        }
                     },
                     KeyCode::Up => match app.working_area {
                         WorkingArea::Services => app.services.previous(),
                         WorkingArea::Objects => app.objects.up(),
-                        WorkingArea::PopUp(ref _method) => {}
+                        WorkingArea::PopUp(ref mut popup) => {
+                            popup.selected = popup.selected.saturating_sub(1);
+                        }
                     },
                     KeyCode::Right => match app.working_area {
                         WorkingArea::Services => {}
                         WorkingArea::Objects => app.objects.right(),
-                        WorkingArea::PopUp(ref _method) => {}
+                        WorkingArea::PopUp(ref mut popup) => {
+                            popup.inputs[0].input(key);
+                        }
                     },
                     KeyCode::Tab => match app.working_area {
                         WorkingArea::Services => app.working_area = WorkingArea::Objects,
@@ -125,7 +159,12 @@ pub async fn run_app<B: Backend>(
                     KeyCode::Esc => {
                         app.working_area = WorkingArea::Objects;
                     }
-                    _ => (),
+                    _ => match app.working_area {
+                        WorkingArea::PopUp(ref mut popup) => {
+                            popup.inputs[popup.selected].input(key);
+                        }
+                        _ => (),
+                    },
                 }
                 tracing::event!(
                     Level::DEBUG,
