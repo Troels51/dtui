@@ -2,7 +2,11 @@ use std::{collections::HashMap, error::Error, io::BufReader};
 
 use async_recursion::async_recursion;
 use tokio::sync::mpsc::{self, Receiver, Sender};
-use zbus::{names::OwnedBusName, zvariant::ObjectPath, Connection};
+use zbus::{
+    names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName},
+    zvariant::{ObjectPath, OwnedValue, StructureBuilder},
+    Connection,
+};
 use zbus_xml::Node;
 
 use crate::messages::{AppMessage, DbusMessage};
@@ -85,6 +89,43 @@ impl DbusActor {
                     let _ = self.app_sender.send(AppMessage::Services(names)).await;
                 }
             }
+            DbusMessage::MethodCallRequest(service, object_path, interface, method, values) => {
+                let mut body = StructureBuilder::new();
+                let is_empty = values.is_empty();
+                for v in values {
+                    body.push_value(v.into());
+                }
+                let method_call_response = if !is_empty {
+                    self.connection
+                        .call_method(
+                            Some(service),
+                            object_path,
+                            Some(interface),
+                            method.clone(),
+                            &body.build().unwrap(),
+                        )
+                        .await
+                } else {
+                    self.connection
+                        .call_method(
+                            Some(service),
+                            object_path,
+                            Some(interface),
+                            method.clone(),
+                            &(),
+                        )
+                        .await
+                };
+                match method_call_response {
+                    Ok(message) => {
+                        let _ = self
+                            .app_sender
+                            .send(AppMessage::MethodCallResponse(method, message))
+                            .await;
+                    }
+                    Err(e) => tracing::debug!("Method call error {}", e),
+                };
+            }
         }
     }
 }
@@ -116,6 +157,18 @@ impl DbusActorHandle {
 
     pub async fn request_services(&self) {
         let msg = DbusMessage::ServiceRequest();
+        let _ = self.sender.send(msg).await;
+    }
+
+    pub async fn call_method(
+        &self,
+        service: OwnedBusName,
+        object: zbus::zvariant::OwnedObjectPath,
+        interface: OwnedInterfaceName,
+        method: OwnedMemberName,
+        values: Vec<OwnedValue>,
+    ) {
+        let msg = DbusMessage::MethodCallRequest(service, object, interface, method, values);
         let _ = self.sender.send(msg).await;
     }
 }

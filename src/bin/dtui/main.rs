@@ -1,10 +1,10 @@
 pub mod app;
 pub mod dbus_handler;
 pub mod messages;
+pub mod parser;
 pub mod stateful_list;
 pub mod stateful_tree;
 pub mod ui;
-
 use app::{run_app, App};
 use clap::{command, ArgGroup, Parser, ValueEnum};
 use crossterm::{
@@ -22,9 +22,9 @@ use ratatui::{
 };
 use std::{error::Error, io, time::Duration};
 use tokio::sync::mpsc::{self};
-use tracing::{level_filters::LevelFilter};
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::{layer::SubscriberExt};
 
 use zbus::{Connection, ConnectionBuilder};
 
