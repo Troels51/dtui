@@ -7,7 +7,7 @@ authors = ["Troels Hoffmeyer <troels.d.hoffmeyer@gmail.com>"]
 description = "dBus TUI for introspecting your current dbus session/system"
 license = "MIT"
 repository = "https://github.com/Troels51/dtui"
-rust-version = "1.75"
+rust-version = "1.80"
 keywords = ["tui", "dbus"]
 categories = ["command-line-utilities"]
 exclude = [
@@ -17,18 +17,18 @@ exclude = [
 
 [dependencies]
 tui-tree-widget = "0.21"
-zbus = { git = "https://github.com/dbus2/zbus.git", branch = "main", default-features = false, features = ["tokio"] }
 crossterm = "0.27"
 tokio = { version = "1.32", features = ["full"] }
 async-recursion = "1.1.1"
 itertools = "0.11.0"
 clap = { version = "4.4.1", features = ["derive"] }
 ratatui = { version = "0.27", features = ["macros"] }
-zbus_xml = { git = "https://github.com/dbus2/zbus.git", branch = "main", default-features = false }
 tracing-error = "0.2.0"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "fmt"] }
 tracing-journald = "0.3.0"
 tui-textarea = "0.5.1"
-zbus_names = { git = "https://github.com/dbus2/zbus.git", branch = "main", default-features = false }
 chumsky = "0.9.3"
+zbus = {version = "5.1.0", features = ["tokio"]}
+zbus_names = "4.1.0"
+zbus_xml = "5.0.1"

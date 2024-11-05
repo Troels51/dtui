@@ -118,13 +118,25 @@ fn node_to_treeitems(node: &zbus_xml::Node<'static>) -> Vec<TreeItem<'static, Db
                         .args()
                         .iter()
                         .filter(|arg| arg.direction().is_some_and(|s| s == ArgDirection::In))
-                        .map(|arg| format!("{}: {}", arg.name().unwrap_or_default(), arg.ty()))
+                        .map(|arg| {
+                            format!(
+                                "{}: {}",
+                                arg.name().unwrap_or_default(),
+                                arg.ty().to_string()
+                            )
+                        })
                         .collect();
                     let outputs: Vec<String> = method
                         .args()
                         .iter()
                         .filter(|arg| arg.direction().is_some_and(|s| s == ArgDirection::Out))
-                        .map(|arg| format!("{}: {}", arg.name().unwrap_or_default(), arg.ty()))
+                        .map(|arg| {
+                            format!(
+                                "{}: {}",
+                                arg.name().unwrap_or_default(),
+                                arg.ty().to_string()
+                            )
+                        })
                         .collect();
                     let return_arrow = if outputs.is_empty() { "" } else { "=>" }; // If we dont return anything, the arrow shouldnt be there
                     let leaf_string: String = format!(
@@ -146,7 +158,7 @@ fn node_to_treeitems(node: &zbus_xml::Node<'static>) -> Vec<TreeItem<'static, Db
                 .map(|property| {
                     TreeItem::new_leaf(
                         DbusIdentifier::Property(property.name().to_string()),
-                        format!("{}: {}", property.name(), property.ty()),
+                        format!("{}: {}", property.name(), property.ty().to_string()),
                     )
                 })
                 .collect();
@@ -159,7 +171,13 @@ fn node_to_treeitems(node: &zbus_xml::Node<'static>) -> Vec<TreeItem<'static, Db
                         .args()
                         .iter()
                         .filter(|arg| arg.direction().is_some_and(|s| s == ArgDirection::In))
-                        .map(|arg| format!("{}: {}", arg.name().unwrap_or_default(), arg.ty()))
+                        .map(|arg| {
+                            format!(
+                                "{}: {}",
+                                arg.name().unwrap_or_default(),
+                                arg.ty().to_string()
+                            )
+                        })
                         .collect();
                     let leaf_string: String = format!("{}({})", signal.name(), inputs.join(", "));
                     TreeItem::new_leaf(

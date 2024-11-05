@@ -125,10 +125,10 @@ pub fn ui<B: Backend>(frame: &mut Frame, app: &mut App) {
                     Block::default()
                         .borders(Borders::ALL)
                         .title(format!("name: {} | {}", arg.name().unwrap(), inout))
-                        .title_bottom(format!("type: {}", arg.ty())),
+                        .title_bottom(format!("type: {}", arg.ty().to_string())),
                 );
                 let parser = get_parser(
-                    zvariant::parsed::Signature::from_str(arg.ty().signature().as_str())
+                    zvariant::Signature::from_str(arg.ty().to_string().as_str())
                         .expect("The type description for the method we got was not good"),
                 );
                 let input = match arg.direction().unwrap_or(zbus_xml::ArgDirection::In) {
