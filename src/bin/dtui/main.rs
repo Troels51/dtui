@@ -26,7 +26,7 @@ use tracing::level_filters::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::prelude::*;
 
-use zbus::{Connection, ConnectionBuilder};
+use zbus::{conn, Connection};
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum BusType {
@@ -62,9 +62,7 @@ where
         BusType::Session => Connection::session().await?,
     };
     if let Some(address) = args.address {
-        connection = ConnectionBuilder::address(address.as_str())?
-            .build()
-            .await?;
+        connection = conn::Builder::address(address.as_str())?.build().await?;
     }
     let (dbus_handler_sender, app_receiver) = mpsc::channel::<AppMessage>(16);
     let dbus_handler = DbusActorHandle::new(dbus_handler_sender, connection);

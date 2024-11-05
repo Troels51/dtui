@@ -2,7 +2,6 @@ use std::time::{Duration, Instant};
 
 use chumsky::Parser;
 use crossterm::event::{self, Event, KeyCode};
-use itertools::Itertools;
 use ratatui::{backend::Backend, Terminal};
 use tokio::sync::mpsc::Receiver;
 use tracing::Level;
