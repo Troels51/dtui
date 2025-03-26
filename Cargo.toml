@@ -18,17 +18,17 @@ exclude = [
 [dependencies]
 tui-tree-widget = "0.21"
 crossterm = "0.27"
-tokio = { version = "1.32", features = ["full"] }
+tokio = { version = "1.44", features = ["full"] }
 async-recursion = "1.1.1"
 itertools = "0.11.0"
-clap = { version = "4.4.1", features = ["derive"] }
+clap = { version = "4.5.33", features = ["derive"] }
 ratatui = { version = "0.27", features = ["macros"] }
-tracing-error = "0.2.0"
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter", "json", "fmt"] }
-tracing-journald = "0.3.0"
-tui-textarea = "0.5.1"
+tracing-error = "0.2.1"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json", "fmt"] }
+tracing-journald = "0.3.1"
+tui-textarea = "0.5.3"
 chumsky = "0.9.3"
-zbus = {version = "5.1.0", features = ["tokio"]}
-zbus_names = "4.1.0"
-zbus_xml = "5.0.1"
+zbus = {version = "5.5.0", features = ["tokio"]}
+zbus_names = "4.2.0"
+zbus_xml = "5.0.2"
