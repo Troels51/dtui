@@ -17,10 +17,12 @@ use tui_textarea::TextArea;
 use tui_tree_widget::Tree;
 use zbus::zvariant::{self};
 
+
 use crate::{
-    app::{App, MethodArgVisual, WorkingArea},
+    app2::{App, WorkingArea},
     parser::get_parser,
 };
+use crate::app2::MethodArgVisual;
 
 fn working_area_border(app: &App, working_area: WorkingArea) -> Color {
     if app.working_area == working_area {

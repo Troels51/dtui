@@ -1,0 +1,21 @@
+{
+  "keybindings": {
+    "All": {
+      "<q>": "Quit", // Quit the application
+      "<Ctrl-d>": "Quit", // Another way to quit
+      "<Ctrl-c>": "Quit", // Yet another way to quit
+      "<Ctrl-z>": "Suspend", // Suspend the application
+      "<tab>": "NextFocus", // Next focus
+      "<down>": "Down", // Down
+      "<up>": "Up" // Up
+    },
+    "Services": {
+      "<enter>": "GetService" // Get service selected
+    },
+    "Objects": {
+      "<enter>": "InvokeDbus", // Invoke the dbus method/property/signal
+      "<right>": "DownTree",
+      "<left>": "UpTree"
+    },
+  }
+}

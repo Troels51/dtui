@@ -1,301 +1,334 @@
-use std::time::{Duration, Instant};
-
-use chumsky::Parser;
-use crossterm::event::{self, Event, KeyCode};
-use ratatui::{backend::Backend, Terminal};
-use tokio::sync::mpsc::Receiver;
-use tracing::Level;
-use tui_textarea::CursorMove;
-use zbus::{
-    names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName},
-    zvariant::OwnedObjectPath,
+use chumsky::primitive::Container;
+use clap::Arg;
+use color_eyre::Result;
+use crossterm::event::KeyEvent;
+use ratatui::{
+    layout::{Constraint, Direction, Layout},
+    prelude::Rect,
 };
+use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
+use tracing::{debug, info};
+use zbus::{conn, Connection};
 
 use crate::{
-    dbus_handler::DbusActorHandle,
-    messages::AppMessage,
-    stateful_list::StatefulList,
-    stateful_tree::{MethodDescription, StatefulTree},
-    ui::ui,
+    action::Action, components::{
+        self, bottom_text::BottomText, objects_view::ObjectsView, services_view::ServicesView,
+        Component, Components,
+    }, config::Config, dbus_handler::{self, DbusActorHandle}, messages::AppMessage, tui::{Event, Tui}, Args, BusType
 };
 
-pub struct MethodArgVisual {
-    pub text_area: tui_textarea::TextArea<'static>,
-    pub parser:
-        Box<dyn Parser<char, zbus::zvariant::Value<'static>, Error = chumsky::error::Simple<char>>>,
-    pub is_input: bool, // Is this Arg an input or output
-}
-pub struct MethodCallPopUp {
-    pub service: OwnedBusName,
-    pub object: OwnedObjectPath,
-    pub interface: OwnedInterfaceName,
-    pub method_description: MethodDescription,
-    pub method_arg_vis: Vec<MethodArgVisual>,
-    pub selected: usize,
-    pub called: bool,
-}
-impl MethodCallPopUp {
-    fn new(
-        service: OwnedBusName,
-        object: OwnedObjectPath,
-        interface: OwnedInterfaceName,
-        method_description: MethodDescription,
-    ) -> Self {
-        Self {
-            service,
-            object,
-            interface,
-            method_description,
-            method_arg_vis: Vec::new(), // This gets filled on UI. Maybe there is a better way of doing this
-            selected: 0,
-            called: false,
-        }
-    }
+pub struct App {
+    config: Config,
+    tick_rate: f64,
+    frame_rate: f64,
+    components: Components,
+    should_quit: bool,
+    should_suspend: bool,
+    focus: Focus,
+    last_tick_key_events: Vec<KeyEvent>,
+    action_tx: mpsc::UnboundedSender<Action>,
+    action_rx: mpsc::UnboundedReceiver<Action>,
+    dbus_handler: DbusActorHandle,
+    dbus_receiver: mpsc::UnboundedReceiver<AppMessage>,
 }
 
-impl PartialEq for MethodCallPopUp {
-    fn eq(&self, other: &Self) -> bool {
-        self.method_description == other.method_description
-    }
-}
-
-#[derive(PartialEq)]
-pub enum WorkingArea {
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Focus {
+    #[default]
     Services,
     Objects,
-    MethodCallPopUp(MethodCallPopUp),
+    All, // For keybindings or interactions that are always active
 }
-// TODO: maybe we should use Components instead, Objects/Services/PopUp would be a componenet, and they would have their own input/render functions
-pub struct App {
-    dbus_rx: Receiver<AppMessage>,
-    dbus_handle: DbusActorHandle,
-    pub services: StatefulList<OwnedBusName>,
-    pub objects: StatefulTree,
-    pub working_area: WorkingArea,
+
+impl Focus {
+    fn next(&self) -> Focus {
+        match self {
+            Focus::Services => Focus::Objects,
+            Focus::Objects => Focus::Services,
+            Focus::All => Focus::Services,
+        }
+    }
 }
 
 impl App {
-    pub fn new(dbus_rx: Receiver<AppMessage>, dbus_handle: DbusActorHandle) -> App {
-        App {
-            dbus_rx,
-            dbus_handle,
-            services: StatefulList::with_items(vec![]),
-            objects: StatefulTree::new(),
-            working_area: WorkingArea::Services,
+    pub async fn new(tick_rate: f64, frame_rate: f64, args: Args) -> Result<Self> {
+        let (action_tx, action_rx) = mpsc::unbounded_channel();
+
+        // Create Dbus actor
+        let mut connection = match args.bus {
+            BusType::System => Connection::system().await?,
+            BusType::Session => Connection::session().await?,
+        };
+
+        if let Some(address) = args.address {
+            connection = conn::Builder::address(address.as_str())?.build().await?;
         }
+        let (dbus_handler_sender, dbus_receiver) = mpsc::unbounded_channel();
+        let dbus_handler = DbusActorHandle::new(dbus_handler_sender, connection);
+
+        Ok(Self {
+            tick_rate,
+            frame_rate,
+            components: Components::new(),
+            should_quit: false,
+            should_suspend: false,
+            config: Config::new()?,
+            focus: Focus::Services,
+            last_tick_key_events: Vec::new(),
+            action_tx,
+            action_rx,
+            dbus_handler,
+            dbus_receiver,
+        })
     }
 
-    pub fn on_tick(&self) {}
-}
+    pub async fn run(&mut self) -> Result<()> {
+        let mut tui = Tui::new()?
+            // .mouse(true) // uncomment this line to enable mouse support
+            .tick_rate(self.tick_rate)
+            .frame_rate(self.frame_rate);
+        tui.enter()?;
 
-pub async fn run_app<B: Backend>(
-    terminal: &mut Terminal<B>,
-    mut app: App,
-    tick_rate: Duration,
-) -> Result<(), zbus::Error> {
-    let mut last_tick = Instant::now();
-    app.dbus_handle.request_services().await;
+        self.components
+            .register_action_handler(self.action_tx.clone())?;
+        self.components
+            .register_dbus_actor_handler(self.dbus_handler.clone())?;
+        self.components
+            .register_config_handler(self.config.clone())?;
+        self.components.init(tui.size()?)?;
+        self.components.set_focus(self.focus);
 
-    loop {
-        terminal.draw(|frame| ui::<B>(frame, &mut app))?;
+        let action_tx = self.action_tx.clone();
 
-        match app.dbus_rx.try_recv() {
-            Ok(message) => match message {
-                AppMessage::Objects((_service_name, root_node)) => {
-                    app.objects = StatefulTree::from_nodes(root_node);
-                }
-                AppMessage::Services(names) => {
-                    app.services = StatefulList::with_items(names);
-                }
-                AppMessage::MethodCallResponse(_method, message) => {
-                    if let WorkingArea::MethodCallPopUp(ref mut popup) = app.working_area {
-                        popup.called = true;
-                        if let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>()
-                        {
-                            for (index, output_field) in popup
-                                .method_arg_vis
-                                .iter_mut()
-                                .filter(|field| !field.is_input)
-                                .enumerate()
-                            {
-                                output_field.text_area.move_cursor(CursorMove::Head);
-                                output_field.text_area.delete_line_by_end(); // The way to clear a text area
-                                output_field
-                                    .text_area
-                                    .insert_str(format!("{}", value.fields()[index]));
-                            }
-                        }
-                    }
-                }
-            },
-            _error => (),
-        };
-        let timeout = tick_rate
-            .checked_sub(last_tick.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
-        if crossterm::event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') => match app.working_area {
-                        WorkingArea::Services => return Ok(()),
-                        WorkingArea::Objects => return Ok(()),
-                        WorkingArea::MethodCallPopUp(_) => (),
-                    },
-                    KeyCode::Enter => {
-                        match app.working_area {
-                            WorkingArea::Services => {
-                                if let Some(selected_index) = app.services.state.selected() {
-                                    let item = app.services.items[selected_index].clone();
-                                    app.dbus_handle.request_objects_from(item).await;
-                                }
-                            }
-                            WorkingArea::Objects => {
-                                if let Some(full_description) =
-                                    extract_description(app.objects.state.selected())
-                                {
-                                    app.working_area =
-                                        WorkingArea::MethodCallPopUp(MethodCallPopUp::new(
-                                            app.services.items
-                                                [app.services.state.selected().unwrap()]
-                                            .clone(),
-                                            full_description.0,
-                                            full_description.1,
-                                            full_description.2,
-                                        ));
-                                }
-                            }
-                            WorkingArea::MethodCallPopUp(ref popup) =>
-                            // Call method
-                            {
-                                let parses = popup
-                                    .method_arg_vis
-                                    .iter()
-                                    .filter(|input| input.is_input)
-                                    .map(|input| {
-                                        input.parser.parse(input.text_area.lines()[0].clone())
-                                    });
-                                if parses.clone().all(
-                                    |result: Result<
-                                        zbus::zvariant::Value<'static>,
-                                        Vec<chumsky::error::Simple<char>>,
-                                    >| Result::is_ok(&result),
-                                ) {
-                                    let values: Vec<zbus::zvariant::OwnedValue> = parses
-                                        .map(|value| {
-                                            // We know that they are all Ok, so unwrap is fine here
-                                            zbus::zvariant::OwnedValue::try_from(value.unwrap())
-                                                .unwrap()
-                                        })
-                                        .collect();
-                                    app.dbus_handle
-                                        .call_method(
-                                            popup.service.clone(),
-                                            popup.object.clone(),
-                                            popup.interface.clone(),
-                                            OwnedMemberName::from(
-                                                popup.method_description.0.name(),
-                                            ),
-                                            values,
-                                        )
-                                        .await;
-                                } else {
-                                    // Alert user that call cannot be made if arguments cannot be parsed
-                                }
-                            }
-                        }
-                    }
-                    KeyCode::Left => match app.working_area {
-                        WorkingArea::Services => app.services.unselect(),
-                        WorkingArea::Objects => app.objects.left(),
-                        WorkingArea::MethodCallPopUp(ref mut popup) => {
-                            popup.method_arg_vis[0].text_area.input(key);
-                        }
-                    },
-                    KeyCode::Down => match app.working_area {
-                        WorkingArea::Services => app.services.next(),
-                        WorkingArea::Objects => app.objects.down(),
-                        WorkingArea::MethodCallPopUp(ref mut popup) => {
-                            popup.selected =
-                                std::cmp::min(popup.selected + 1, popup.method_arg_vis.len());
-                        }
-                    },
-                    KeyCode::Up => match app.working_area {
-                        WorkingArea::Services => app.services.previous(),
-                        WorkingArea::Objects => app.objects.up(),
-                        WorkingArea::MethodCallPopUp(ref mut popup) => {
-                            popup.selected = popup.selected.saturating_sub(1);
-                        }
-                    },
-                    KeyCode::Right => match app.working_area {
-                        WorkingArea::Services => {}
-                        WorkingArea::Objects => app.objects.right(),
-                        WorkingArea::MethodCallPopUp(ref mut popup) => {
-                            popup.method_arg_vis[0].text_area.input(key);
-                        }
-                    },
-                    KeyCode::Tab => match app.working_area {
-                        WorkingArea::Services => app.working_area = WorkingArea::Objects,
-                        WorkingArea::Objects => app.working_area = WorkingArea::Services,
-                        WorkingArea::MethodCallPopUp(ref _method) => {}
-                    },
-                    KeyCode::Esc => {
-                        app.working_area = WorkingArea::Objects;
-                    }
-                    _ => match app.working_area {
-                        WorkingArea::MethodCallPopUp(ref mut popup) => {
-                            popup.method_arg_vis[popup.selected].text_area.input(key);
-                        }
-                        _ => (),
-                    },
-                }
-                tracing::event!(
-                    Level::DEBUG,
-                    "{}",
-                    format!("state = {:?}", app.objects.state)
-                );
+        self.dbus_handler.request_services().await;
+
+
+        loop {
+            self.handle_events(&mut tui).await?;
+            self.handle_actions(&mut tui).await?;
+            self.handle_dbus_actions(&mut tui)?;
+            if self.should_suspend {
+                tui.suspend()?;
+                action_tx.send(Action::Resume)?;
+                action_tx.send(Action::ClearScreen)?;
+                // tui.mouse(true);
+                tui.enter()?;
+            } else if self.should_quit {
+                tui.stop()?;
+                break;
             }
         }
-        if last_tick.elapsed() >= tick_rate {
-            app.on_tick();
-            last_tick = Instant::now();
-        }
+        tui.exit()?;
+        Ok(())
     }
-}
 
-/// Takes a stateful_tree::DbusIdentifier, which is an identifier for where a node is in the UI tree
-/// and if the selection is a method, it will extract the path, interface name and method description
-/// Otherwise it returns None
-fn extract_description(
-    selected: &[crate::stateful_tree::DbusIdentifier],
-) -> Option<(OwnedObjectPath, OwnedInterfaceName, MethodDescription)> {
-    let object_path = selected
-        .iter()
-        .filter_map(|identifier| match identifier {
-            crate::stateful_tree::DbusIdentifier::Object(o) => Some(o),
-            _ => None,
-        })
-        .next();
-    let interface_name = selected
-        .iter()
-        .filter_map(|identifier| match identifier {
-            crate::stateful_tree::DbusIdentifier::Interface(i) => Some(i),
-            _ => None,
-        })
-        .next();
-    let member_name = selected
-        .iter()
-        .filter_map(|identifier| match identifier {
-            crate::stateful_tree::DbusIdentifier::Method(m) => Some(m),
-            _ => None,
-        })
-        .next();
-    if object_path.is_some() && interface_name.is_some() && member_name.is_some() {
-        Some((
-            OwnedObjectPath::try_from(object_path.unwrap().clone()).unwrap(),
-            OwnedInterfaceName::try_from(interface_name.unwrap().clone()).unwrap(),
-            member_name.unwrap().clone(),
-        ))
-    } else {
-        None
+    async fn handle_events(&mut self, tui: &mut Tui) -> Result<()> {
+        let Some(event) = tui.next_event().await else {
+            return Ok(());
+        };
+        let action_tx = self.action_tx.clone();
+        match event {
+            Event::Quit => action_tx.send(Action::Quit)?,
+            Event::Tick => action_tx.send(Action::Tick)?,
+            Event::Render => action_tx.send(Action::Render)?,
+            Event::Resize(x, y) => action_tx.send(Action::Resize(x, y))?,
+            Event::Key(key) => self.handle_key_event(key)?,
+            _ => {}
+        }
+        if let Some(action) = self
+            .components
+            .service_view
+            .handle_events(Some(event.clone()))?
+        {
+            action_tx.send(action)?;
+        }
+        if let Some(action) = self
+            .components
+            .object_view
+            .handle_events(Some(event.clone()))?
+        {
+            action_tx.send(action)?;
+        }
+        if let Some(action) = self
+            .components
+            .results_view
+            .handle_events(Some(event.clone()))?
+        {
+            action_tx.send(action)?;
+        }
+        if let Some(action) = self
+            .components
+            .call_view
+            .handle_events(Some(event.clone()))?
+        {
+            action_tx.send(action)?;
+        }
+        if let Some(action) = self
+            .components
+            .bottom_text
+            .handle_events(Some(event.clone()))?
+        {
+            action_tx.send(action)?;
+        }
+        Ok(())
+    }
+
+    fn handle_key_event(&mut self, key: KeyEvent) -> Result<()> {
+        let action_tx = self.action_tx.clone();
+        let Some(generic_keymap) = self.config.keybindings.get(&Focus::All) else {
+            return Ok(());
+        };
+        let Some(focus_keymap) = self.config.keybindings.get(&self.focus) else {
+            return Ok(());
+        };
+        for keymap in [generic_keymap, focus_keymap] {
+            match keymap.get(&vec![key]) {
+                Some(action) => {
+                    info!("Got action: {action:?}");
+                    action_tx.send(action.clone())?;
+                }
+                _ => {
+                    // If the key was not handled as a single key action,
+                    // then consider it for multi-key combinations.
+                    self.last_tick_key_events.push(key);
+
+                    // Check for multi-key combinations
+                    if let Some(action) = focus_keymap.get(&self.last_tick_key_events) {
+                        info!("Got action: {action:?}");
+                        action_tx.send(action.clone())?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_actions(&mut self, tui: &mut Tui) -> Result<()> {
+        while let Ok(action) = self.action_rx.try_recv() {
+            if action != Action::Tick && action != Action::Render {
+                debug!("{action:?}");
+            }
+            match action {
+                Action::Tick => {
+                    self.last_tick_key_events.drain(..);
+                }
+                Action::Quit => self.should_quit = true,
+                Action::Suspend => self.should_suspend = true,
+                Action::Resume => self.should_suspend = false,
+                Action::ClearScreen => tui.terminal.clear()?,
+                Action::Resize(w, h) => self.handle_resize(tui, w, h)?,
+                Action::Render => self.render(tui)?,
+                Action::NextFocus => {
+                    self.focus = self.focus.next();
+                    self.components.set_focus(self.focus);
+                }
+                _ => {}
+            }
+            if let Some(action) = self.components.service_view.update(action.clone()).await? {
+                self.action_tx.send(action)?
+            };
+            if let Some(action) = self.components.object_view.update(action.clone()).await? {
+                self.action_tx.send(action)?
+            };
+            if let Some(action) = self.components.results_view.update(action.clone()).await? {
+                self.action_tx.send(action)?
+            };
+            if let Some(action) = self.components.call_view.update(action.clone()).await? {
+                self.action_tx.send(action)?
+            };
+            if let Some(action) = self.components.bottom_text.update(action.clone()).await? {
+                self.action_tx.send(action)?
+            };
+        }
+        Ok(())
+    }
+
+    fn handle_resize(&mut self, tui: &mut Tui, w: u16, h: u16) -> Result<()> {
+        tui.resize(Rect::new(0, 0, w, h))?;
+        self.render(tui)?;
+        Ok(())
+    }
+
+    fn render(&mut self, tui: &mut Tui) -> Result<()> {
+        tui.draw(|frame| {
+            /*
+                +----------------+----------------+
+                |                |                |
+                |                |                |
+                |                |                |
+                |                |                |
+                |     Services   |     Objects    |
+                |                |                |
+                |                |                |
+                |                |                |
+                |                |                |
+                +----------------+----------------+
+                |                |                |
+                |                |                |
+                |   Result log   |       Call     |
+                |                |                |
+                |                |                |
+                +---------------------------------+
+                |           Bottom help text      |
+                +---------------------------------+
+            */
+
+            let vertical_split = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(5), Constraint::Min(5), Constraint::Max(2)])
+                .split(frame.area());
+            let service_object_split = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(25), Constraint::Percentage(75)].as_ref())
+                .split(vertical_split[0]);
+            let result_call_split = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(25), Constraint::Percentage(75)].as_ref())
+                .split(vertical_split[1]);
+
+            if let Err(err) = self.components.service_view.draw(frame, service_object_split[0]) {
+                let _ = self
+                    .action_tx
+                    .send(Action::Error(format!("Failed to draw: {:?}", err)));
+            }
+            if let Err(err) = self.components.object_view.draw(frame, service_object_split[1]) {
+                let _ = self
+                    .action_tx
+                    .send(Action::Error(format!("Failed to draw: {:?}", err)));
+            }
+            if let Err(err) = self.components.results_view.draw(frame, result_call_split[0]) {
+                let _ = self
+                    .action_tx
+                    .send(Action::Error(format!("Failed to draw: {:?}", err)));
+            }
+            if let Err(err) = self.components.call_view.draw(frame, result_call_split[1]) {
+                let _ = self
+                    .action_tx
+                    .send(Action::Error(format!("Failed to draw: {:?}", err)));
+            }
+            if let Err(err) = self.components.bottom_text.draw(frame, vertical_split[2]) {
+                let _ = self
+                    .action_tx
+                    .send(Action::Error(format!("Failed to draw: {:?}", err)));
+            }
+        })?;
+        Ok(())
+    }
+    
+    fn handle_dbus_actions(&mut self, tui: &mut Tui) -> Result<()> {
+        while let Ok(action) = self.dbus_receiver.try_recv() {
+            if let Some(action) = self.components.service_view.update_from_dbus(action.clone())? {
+                self.action_tx.send(action)?
+            };
+            if let Some(action) = self.components.object_view.update_from_dbus(action.clone())? {
+                self.action_tx.send(action)?
+            };
+            if let Some(action) = self.components.bottom_text.update_from_dbus(action.clone())? {
+                self.action_tx.send(action)?
+            };
+        }
+        Ok(())
     }
 }

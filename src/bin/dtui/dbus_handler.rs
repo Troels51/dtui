@@ -1,7 +1,7 @@
 use std::{collections::HashMap, error::Error, io::BufReader};
 
 use async_recursion::async_recursion;
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::mpsc::{self, Receiver, Sender, UnboundedSender};
 use zbus::{
     names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName},
     zvariant::{ObjectPath, OwnedValue, StructureBuilder},
@@ -12,13 +12,13 @@ use zbus_xml::Node;
 use crate::messages::{AppMessage, DbusMessage};
 
 pub struct DbusActor {
-    app_sender: Sender<AppMessage>,
+    app_sender: UnboundedSender<AppMessage>,
     app_receiver: Receiver<DbusMessage>,
     connection: Connection,
 }
 impl DbusActor {
     pub fn new(
-        app_sender: Sender<AppMessage>,
+        app_sender: UnboundedSender<AppMessage>,
         app_receiver: Receiver<DbusMessage>,
         connection: Connection,
     ) -> Self {
@@ -69,6 +69,7 @@ impl DbusActor {
     }
 
     pub async fn handle_message(&mut self, msg: DbusMessage) {
+        tracing::info!("Handle message {:?}", msg);
         match msg {
             DbusMessage::GetObjects(service_name) => {
                 let path_name = "/".to_string();
@@ -77,7 +78,6 @@ impl DbusActor {
                 if let Ok(nodes) = self.get_sub_nodes(&service_name, &path).await {
                     self.app_sender
                         .send(AppMessage::Objects((service_name, nodes)))
-                        .await
                         .expect("channel dead");
                 }
             }
@@ -86,7 +86,7 @@ impl DbusActor {
                     .await
                     .expect("Could not create DbusProxy");
                 if let Ok(names) = proxy.list_names().await {
-                    let _ = self.app_sender.send(AppMessage::Services(names)).await;
+                    let _ = self.app_sender.send(AppMessage::Services(names));
                 }
             }
             DbusMessage::MethodCallRequest(service, object_path, interface, method, values) => {
@@ -120,8 +120,7 @@ impl DbusActor {
                     Ok(message) => {
                         let _ = self
                             .app_sender
-                            .send(AppMessage::MethodCallResponse(method, message))
-                            .await;
+                            .send(AppMessage::MethodCallResponse(method, message));
                     }
                     Err(e) => tracing::debug!("Method call error {}", e),
                 };
@@ -136,13 +135,13 @@ async fn run_actor(mut actor: DbusActor) {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DbusActorHandle {
     sender: mpsc::Sender<DbusMessage>,
 }
 
 impl DbusActorHandle {
-    pub fn new(app_sender: Sender<AppMessage>, connection: Connection) -> Self {
+    pub fn new(app_sender: UnboundedSender<AppMessage>, connection: Connection) -> Self {
         let (sender, receiver) = mpsc::channel(8);
         let actor = DbusActor::new(app_sender, receiver, connection);
         tokio::spawn(run_actor(actor));
@@ -154,12 +153,22 @@ impl DbusActorHandle {
         let msg = DbusMessage::GetObjects(object);
         let _ = self.sender.send(msg).await;
     }
+    pub fn sync_request_objects_from(&self, object: OwnedBusName) {
+        let msg = DbusMessage::GetObjects(object);
+        tracing::info!(" msg {:?}", msg);
+
+        let e = self.sender.blocking_send(msg);
+        tracing::info!(" sync error {:?}", e);
+    }
 
     pub async fn request_services(&self) {
         let msg = DbusMessage::ServiceRequest();
         let _ = self.sender.send(msg).await;
     }
-
+    pub fn sync_request_services(&self) {
+        let msg = DbusMessage::ServiceRequest();
+        let _ = self.sender.blocking_send(msg);
+    }
     pub async fn call_method(
         &self,
         service: OwnedBusName,
@@ -170,5 +179,16 @@ impl DbusActorHandle {
     ) {
         let msg = DbusMessage::MethodCallRequest(service, object, interface, method, values);
         let _ = self.sender.send(msg).await;
+    }
+    pub fn sync_call_method(
+        &self,
+        service: OwnedBusName,
+        object: zbus::zvariant::OwnedObjectPath,
+        interface: OwnedInterfaceName,
+        method: OwnedMemberName,
+        values: Vec<OwnedValue>,
+    ) {
+        let msg = DbusMessage::MethodCallRequest(service, object, interface, method, values);
+        let _ = self.sender.blocking_send(msg);
     }
 }
