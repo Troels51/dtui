@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 use tui_tree_widget::{TreeItem, TreeState};
-use zbus_xml::{ArgDirection, Method, Node};
+use zbus_names::{OwnedMemberName, OwnedPropertyName};
+use zbus_xml::{Annotation, Arg, ArgDirection, Method, Node, Property};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MemberTypes {
     Methods,
     Properties,
@@ -15,25 +17,96 @@ pub enum MemberTypes {
 //  > Interfaces
 //   > Member (Aka one of Method/Property/Signal)
 //    > Methods/Properties/Signals (The actual list of the methods)
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DbusIdentifier {
-    Object(String),            // ObjectPath
-    Interface(String),         // InterfaceName
-    Member(MemberTypes),       // Can be Method, Properties, Signals
-    Method(MethodDescription), // zbus_name::MemberName
-    Property(String),          // zbus_name::PropertyName
-    Signal(String),            // zbus_name::MemberName
+    Object(String),          // ObjectPath
+    Interface(String),       // InterfaceName
+    Member(MemberTypes),     // Can be Method, Properties, Signals
+    Method(OwnedMethod),     // zbus_name::MemberName
+    Property(OwnedProperty), // zbus_name::PropertyName
+    Signal(String),          // zbus_name::MemberName
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct MethodDescription(pub Method<'static>);
+// OwnedMethod and OwnedProperty is zbus_xml::Method/Property but owned
+//TODO: Consider moving getting this or something similar into zbus_xml
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OwnedMethod {
+    pub(crate) name: OwnedMemberName,
+    pub(crate) args: Vec<Arg>,
+    pub(crate) annotations: Vec<Annotation>,
+}
+
+impl From<Method<'_>> for OwnedMethod {
+    fn from(value: Method<'_>) -> Self {
+        OwnedMethod {
+            name: value.name().to_owned().into(),
+            args: value.args().to_owned(),
+            annotations: value.annotations().to_owned(),
+        }
+    }
+}
+
+impl OwnedMethod {
+    pub fn name(&self) -> &OwnedMemberName {
+        &self.name
+    }
+    pub fn args(&self) -> &Vec<Arg> {
+        &self.args
+    }
+    pub fn annotations(&self) -> &Vec<Annotation> {
+        &self.annotations
+    }
+}
 
 // Rely on PartialEq
-impl Eq for MethodDescription {}
+impl Eq for OwnedMethod {}
 
-impl std::hash::Hash for MethodDescription {
+impl std::hash::Hash for OwnedMethod {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.name().hash(state);
+        self.name().hash(state);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OwnedProperty {
+    pub(crate) name: OwnedPropertyName,
+    pub(crate) ty: zbus_xml::Signature,
+    pub(crate) access: zbus_xml::PropertyAccess,
+    pub(crate) annotations: Vec<Annotation>,
+}
+
+impl From<Property<'_>> for OwnedProperty {
+    fn from(value: Property<'_>) -> Self {
+        Self {
+            name: value.name().to_owned().into(),
+            ty: value.ty().to_owned(),
+            access: value.access().to_owned(),
+            annotations: value.annotations().to_owned(),
+        }
+    }
+}
+
+impl OwnedProperty {
+    pub fn name(&self) -> &OwnedPropertyName {
+        &self.name
+    }
+    pub fn ty(&self) -> &zbus_xml::Signature {
+        &self.ty
+    }
+    pub fn access(&self) -> &zbus_xml::PropertyAccess {
+        &self.access
+    }
+    pub fn annotations(&self) -> &Vec<Annotation> {
+        &self.annotations
+    }
+}
+
+// Rely on PartialEq
+impl Eq for OwnedProperty {}
+
+impl std::hash::Hash for OwnedProperty {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name().hash(state);
     }
 }
 
@@ -146,10 +219,7 @@ fn node_to_treeitems(node: &zbus_xml::Node<'static>) -> Vec<TreeItem<'static, Db
                         return_arrow,
                         outputs.join(", ")
                     );
-                    TreeItem::new_leaf(
-                        DbusIdentifier::Method(MethodDescription(method)),
-                        leaf_string,
-                    )
+                    TreeItem::new_leaf(DbusIdentifier::Method(method.into()), leaf_string)
                 })
                 .collect();
             let properties: Vec<TreeItem<DbusIdentifier>> = interface
@@ -157,7 +227,7 @@ fn node_to_treeitems(node: &zbus_xml::Node<'static>) -> Vec<TreeItem<'static, Db
                 .iter()
                 .map(|property| {
                     TreeItem::new_leaf(
-                        DbusIdentifier::Property(property.name().to_string()),
+                        DbusIdentifier::Property(property.clone().into()),
                         format!("{}: {}", property.name(), property.ty().to_string()),
                     )
                 })
