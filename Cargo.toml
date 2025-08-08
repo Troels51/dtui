@@ -1,13 +1,13 @@
 [package]
 name = "dtui"
 version = "2.0.0"
-edition = "2021"
+edition = "2024"
 default-run = "dtui"
 authors = ["Troels Hoffmeyer <troels.d.hoffmeyer@gmail.com>"]
 description = "dBus TUI for introspecting your current dbus session/system"
 license = "MIT"
 repository = "https://github.com/Troels51/dtui"
-rust-version = "1.80"
+rust-version = "1.88"
 keywords = ["tui", "dbus"]
 categories = ["command-line-utilities"]
 exclude = [
@@ -16,19 +16,33 @@ exclude = [
 ]
 
 [dependencies]
-tui-tree-widget = "0.21"
-crossterm = "0.27"
-tokio = { version = "1.44", features = ["full"] }
+tui-tree-widget = "0.23"
+crossterm = { version = "0.28.1", features = ["serde", "event-stream"] }
+tokio = { version = "1.47", features = ["full"] }
 async-recursion = "1.1.1"
 itertools = "0.11.0"
-clap = { version = "4.5.33", features = ["derive"] }
-ratatui = { version = "0.27", features = ["macros"] }
+clap = { version = "4.5.48", features = ["derive"] }
+ratatui = { version = "0.29", features = ["macros"] }
 tracing-error = "0.2.1"
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json", "fmt"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter", "json", "fmt"] }
 tracing-journald = "0.3.1"
-tui-textarea = "0.5.3"
+tui-textarea = "0.7"
 chumsky = "0.9.3"
-zbus = {version = "5.5.0", features = ["tokio"]}
+zbus = {version = "5.11.0", features = ["tokio", "serde_bytes"]}
 zbus_names = "4.2.0"
 zbus_xml = "5.0.2"
+color-eyre = "0.6.5"
+serde = { version = "1.0.228", features = ["derive"] }
+strum = { version = "0.27.2", features = ["derive"] }
+libc = "0.2.176"
+tokio-util = "0.7.16"
+derive_deref = "1.1.1"
+lazy_static = "1.5.0"
+directories = "6.0.0"
+json5 = "0.4.1"
+config = "0.14.1"
+futures = "0.3.31"
+signal-hook = "0.3.18"
+strip-ansi-escapes = "0.2.1"
+tui-widget-list = "0.13.2"

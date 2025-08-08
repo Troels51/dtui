@@ -1,0 +1,35 @@
+{
+  "keybindings": {
+    "All": {
+      "q": "Quit", // Quit the application
+      "<Ctrl-z>": "Suspend", // Suspend the application
+      "<tab>": "NextFocus", // Next focus
+      "<down>": "Down",
+      "j": "Down",
+      "<up>": "Up",
+      "k": "Up",
+      "?": "Help",
+
+    },
+    "Services": {
+      "<enter>": "GetService" // Get service selected
+    },
+    "Objects": {
+      "<enter>": {"InvokeDbus": "CallMethod"},
+      "g": {"InvokeDbus": "GetProperty"},
+      "s": {"InvokeDbus": "SetProperty"},
+      "<right>": "DownTree",
+      "l": "DownTree",
+      "<left>": "UpTree",
+      "h": "UpTree",
+    },
+    "Call": {
+      "<enter>": "CallActiveMethod", // Call the ongoing method in the call view
+            "i":    {"EditorMode": "Insert"},
+      "<esc>": {"EditorMode": "Normal"},
+    },
+    "Help":{
+      "<esc>": {"Focus": "Services"}
+    }
+  }
+}
