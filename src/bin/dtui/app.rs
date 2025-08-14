@@ -1,5 +1,3 @@
-use chumsky::primitive::Container;
-use clap::Arg;
 use color_eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
@@ -8,14 +6,19 @@ use ratatui::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
-use tracing::{debug, info};
+use tracing::info;
 use zbus::{conn, Connection};
 
 use crate::{
-    action::Action, components::{
-        self, bottom_text::BottomText, objects_view::ObjectsView, services_view::ServicesView,
+    action::Action,
+    components::{
         Component, Components,
-    }, config::Config, dbus_handler::{self, DbusActorHandle}, messages::AppMessage, tui::{Event, Tui}, Args, BusType
+    },
+    config::Config,
+    dbus_handler::DbusActorHandle,
+    messages::AppMessage,
+    tui::{Event, Tui},
+    Args, BusType,
 };
 
 pub struct App {
@@ -38,6 +41,7 @@ pub enum Focus {
     #[default]
     Services,
     Objects,
+    Call,
     All, // For keybindings or interactions that are always active
 }
 
@@ -45,7 +49,8 @@ impl Focus {
     fn next(&self) -> Focus {
         match self {
             Focus::Services => Focus::Objects,
-            Focus::Objects => Focus::Services,
+            Focus::Objects => Focus::Call,
+            Focus::Call => Focus::Services,
             Focus::All => Focus::Services,
         }
     }
@@ -102,7 +107,6 @@ impl App {
         let action_tx = self.action_tx.clone();
 
         self.dbus_handler.request_services().await;
-
 
         loop {
             self.handle_events(&mut tui).await?;
@@ -201,6 +205,7 @@ impl App {
                 }
             }
         }
+        // TODO: Send key event to components
 
         Ok(())
     }
@@ -208,7 +213,7 @@ impl App {
     async fn handle_actions(&mut self, tui: &mut Tui) -> Result<()> {
         while let Ok(action) = self.action_rx.try_recv() {
             if action != Action::Tick && action != Action::Render {
-                debug!("{action:?}");
+                info!("{action:?}");
             }
             match action {
                 Action::Tick => {
@@ -222,6 +227,11 @@ impl App {
                 Action::Render => self.render(tui)?,
                 Action::NextFocus => {
                     self.focus = self.focus.next();
+                    info!("next focus {:?}", self.focus);
+                    self.components.set_focus(self.focus);
+                }
+                Action::StartDbusMethodCall(_) => {
+                    self.focus = Focus::Call;
                     self.components.set_focus(self.focus);
                 }
                 _ => {}
@@ -285,20 +295,32 @@ impl App {
                 .split(vertical_split[0]);
             let result_call_split = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([Constraint::Percentage(25), Constraint::Percentage(75)].as_ref())
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
                 .split(vertical_split[1]);
 
-            if let Err(err) = self.components.service_view.draw(frame, service_object_split[0]) {
+            if let Err(err) = self
+                .components
+                .service_view
+                .draw(frame, service_object_split[0])
+            {
                 let _ = self
                     .action_tx
                     .send(Action::Error(format!("Failed to draw: {:?}", err)));
             }
-            if let Err(err) = self.components.object_view.draw(frame, service_object_split[1]) {
+            if let Err(err) = self
+                .components
+                .object_view
+                .draw(frame, service_object_split[1])
+            {
                 let _ = self
                     .action_tx
                     .send(Action::Error(format!("Failed to draw: {:?}", err)));
             }
-            if let Err(err) = self.components.results_view.draw(frame, result_call_split[0]) {
+            if let Err(err) = self
+                .components
+                .results_view
+                .draw(frame, result_call_split[0])
+            {
                 let _ = self
                     .action_tx
                     .send(Action::Error(format!("Failed to draw: {:?}", err)));
@@ -316,16 +338,41 @@ impl App {
         })?;
         Ok(())
     }
-    
+
     fn handle_dbus_actions(&mut self, tui: &mut Tui) -> Result<()> {
         while let Ok(action) = self.dbus_receiver.try_recv() {
-            if let Some(action) = self.components.service_view.update_from_dbus(action.clone())? {
+            if let Some(action) = self
+                .components
+                .service_view
+                .update_from_dbus(action.clone())?
+            {
                 self.action_tx.send(action)?
             };
-            if let Some(action) = self.components.object_view.update_from_dbus(action.clone())? {
+            if let Some(action) = self
+                .components
+                .object_view
+                .update_from_dbus(action.clone())?
+            {
                 self.action_tx.send(action)?
             };
-            if let Some(action) = self.components.bottom_text.update_from_dbus(action.clone())? {
+            if let Some(action) = self
+                .components
+                .bottom_text
+                .update_from_dbus(action.clone())?
+            {
+                self.action_tx.send(action)?
+            };
+            if let Some(action) = self
+                .components
+                .results_view
+                .update_from_dbus(action.clone())?
+            {
+                self.action_tx.send(action)?
+            };
+            if let Some(action) = self
+                .components
+                .call_view
+                .update_from_dbus(action.clone())? {
                 self.action_tx.send(action)?
             };
         }

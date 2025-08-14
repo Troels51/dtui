@@ -7,7 +7,10 @@ pub struct StatefulList<T> {
 
 impl<T> Default for StatefulList<T> {
     fn default() -> Self {
-        Self { state: Default::default(), items: Default::default() }
+        Self {
+            state: Default::default(),
+            items: Default::default(),
+        }
     }
 }
 

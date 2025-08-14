@@ -5,7 +5,13 @@ use tracing::info;
 use zbus_names::OwnedBusName;
 
 use super::Component;
-use crate::{action::{self, Action}, app::Focus, config::Config, dbus_handler::DbusActorHandle, other::active_area_border_color, stateful_list::StatefulList, stateful_tree::StatefulTree};
+use crate::{
+    action::Action,
+    config::Config,
+    dbus_handler::DbusActorHandle,
+    other::active_area_border_color,
+    stateful_list::StatefulList,
+};
 
 #[derive(Default)]
 pub struct ServicesView {
@@ -58,34 +64,31 @@ impl Component for ServicesView {
                 }
                 _ => {}
             }
-        }
-        else {
+        } else {
             // Handle actions when not focused
             match action {
-                _ => ()
+                _ => (),
             }
         }
 
         Ok(None)
     }
 
-    fn update_from_dbus(&mut self, dbus_action: crate::messages::AppMessage) -> Result<Option<Action>> {
-        
+    fn update_from_dbus(
+        &mut self,
+        dbus_action: crate::messages::AppMessage,
+    ) -> Result<Option<Action>> {
         match dbus_action {
-            crate::messages::AppMessage::Objects(_) => {
-            },
+            crate::messages::AppMessage::Objects(_) => {}
             crate::messages::AppMessage::Services(owned_bus_names) => {
                 info!("services view got services");
 
                 self.services = StatefulList::with_items(owned_bus_names);
-            },
-            crate::messages::AppMessage::MethodCallResponse(owned_member_name, message) => {
-
-            },
+            }
+            crate::messages::AppMessage::MethodCallResponse(owned_member_name, message) => {}
         }
         Ok(None)
     }
-
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let items: Vec<ListItem> = self
@@ -98,20 +101,20 @@ impl Component for ServicesView {
             })
             .collect();
         let items = List::new(items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Services")
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(active_area_border_color(self.active))),
-        )
-        .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-        .highlight_symbol(">> ");
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Services")
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(active_area_border_color(self.active))),
+            )
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .highlight_symbol(">> ");
         frame.render_stateful_widget(items, area, &mut self.services.state);
 
         Ok(())
     }
-    
+
     fn active(&mut self, active: bool) {
         self.active = active
     }

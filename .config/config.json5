@@ -1,7 +1,7 @@
 {
   "keybindings": {
     "All": {
-      "<q>": "Quit", // Quit the application
+      "<esc>": "Quit", // Quit the application
       "<Ctrl-d>": "Quit", // Another way to quit
       "<Ctrl-c>": "Quit", // Yet another way to quit
       "<Ctrl-z>": "Suspend", // Suspend the application
@@ -17,5 +17,8 @@
       "<right>": "DownTree",
       "<left>": "UpTree"
     },
+    "Call": {
+      "<enter>": "CallActiveMethod" // Call the ongoing method in the call view
+    }
   }
 }

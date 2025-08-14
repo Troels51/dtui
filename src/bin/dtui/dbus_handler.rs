@@ -1,7 +1,7 @@
 use std::{collections::HashMap, error::Error, io::BufReader};
 
 use async_recursion::async_recursion;
-use tokio::sync::mpsc::{self, Receiver, Sender, UnboundedSender};
+use tokio::sync::mpsc::{self, Receiver, UnboundedSender};
 use zbus::{
     names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName},
     zvariant::{ObjectPath, OwnedValue, StructureBuilder},

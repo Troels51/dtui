@@ -1,11 +1,10 @@
 use color_eyre::Result;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
-use tui_tree_widget::Tree;
 
 use super::Component;
 use crate::{
-    action::Action, config::Config, other::active_area_border_color, stateful_tree::StatefulTree,
+    action::Action, config::Config,
 };
 
 #[derive(Default)]
@@ -52,8 +51,8 @@ impl Component for BottomText {
         frame.render_widget(helper_paragraph, area);
         Ok(())
     }
-    
-    fn active(&mut self, _active:bool) {
+
+    fn active(&mut self, _active: bool) {
         () // Bottom text cannot be the active component
     }
 }

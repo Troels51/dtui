@@ -1,11 +1,8 @@
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
-use strum::Display;
 use zbus::{
     names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName},
     zvariant::{OwnedObjectPath, OwnedValue},
-    Message,
 };
 use zbus_xml::Node;
 

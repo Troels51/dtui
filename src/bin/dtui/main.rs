@@ -1,41 +1,25 @@
+mod action;
+mod app;
 pub mod app2;
+mod components;
+mod config;
 pub mod dbus_handler;
+mod error;
+mod logging;
 pub mod messages;
+mod other;
 pub mod parser;
 pub mod stateful_list;
 pub mod stateful_tree;
-pub mod ui;
-mod action;
-mod app;
-mod components;
-mod config;
-mod error;
-mod logging;
 mod tui;
-mod other;
+pub mod ui;
 
-use app2::{run_app, App};
 use clap::{command, ArgGroup, Parser, ValueEnum};
-use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use dbus_handler::DbusActorHandle;
 
-use messages::AppMessage;
 
-use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    Terminal,
-};
-use std::{error::Error, io, time::Duration};
-use tokio::sync::mpsc::{self};
-use tracing::{info, level_filters::LevelFilter};
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::prelude::*;
+use std::error::Error;
+use tracing::level_filters::LevelFilter;
 
-use zbus::{conn, Connection};
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum BusType {
@@ -67,9 +51,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     error::init()?;
     let app = app::App::new(10.0, 60.0, args).await;
     match app {
-        Ok(mut app) => {
-            app.run().await?
-        },
+        Ok(mut app) => app.run().await?,
         Err(e) => println!("{}", e),
     }
 

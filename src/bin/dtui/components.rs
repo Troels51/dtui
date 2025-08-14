@@ -3,44 +3,56 @@ use color_eyre::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
 use objects_view::ObjectsView;
 use ratatui::{
-    Frame,
     layout::{Rect, Size},
+    Frame,
 };
 use services_view::ServicesView;
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::{action::Action, components::{call_view::CallView, result_view::ResultsView}, config::Config, dbus_handler::{self, DbusActorHandle}, messages::AppMessage, tui::Event};
+use crate::{
+    action::Action,
+    components::{call_view::CallView, result_view::ResultsView},
+    config::Config,
+    dbus_handler::DbusActorHandle,
+    messages::AppMessage,
+    tui::Event,
+};
 
-pub mod services_view;
-pub mod objects_view;
 pub mod bottom_text;
-pub mod result_view;
 pub mod call_view;
+pub mod objects_view;
+pub mod result_view;
+pub mod services_view;
 
-pub struct Components { 
+pub struct Components {
     pub service_view: ServicesView,
     pub object_view: ObjectsView,
     pub bottom_text: BottomText,
     pub results_view: ResultsView,
-    pub call_view: CallView
-
+    pub call_view: CallView,
 }
 
 impl Components {
     pub fn new() -> Self {
-        Components { service_view: ServicesView::new(), object_view: ObjectsView::new(), bottom_text: BottomText::new(), results_view: ResultsView::new(), call_view: CallView::new() }
+        Components {
+            service_view: ServicesView::new(),
+            object_view: ObjectsView::new(),
+            bottom_text: BottomText::new(),
+            results_view: ResultsView::new(),
+            call_view: CallView::new(),
+        }
     }
-    
+
     pub fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
         self.service_view.register_action_handler(tx.clone())?;
         self.object_view.register_action_handler(tx.clone())?;
         self.results_view.register_action_handler(tx.clone())?;
         self.call_view.register_action_handler(tx.clone())?;
         self.bottom_text.register_action_handler(tx)?;
-        
+
         Ok(())
     }
-    
+
     pub fn register_config_handler(&mut self, config: Config) -> Result<()> {
         self.service_view.register_config_handler(config.clone())?;
         self.object_view.register_config_handler(config.clone())?;
@@ -52,14 +64,18 @@ impl Components {
     }
 
     pub fn register_dbus_actor_handler(&mut self, dbus_handle: DbusActorHandle) -> Result<()> {
-        self.service_view.register_dbus_actor_handle(dbus_handle.clone())?;
-        self.object_view.register_dbus_actor_handle(dbus_handle.clone())?;
-        self.results_view.register_dbus_actor_handle(dbus_handle.clone())?;
-        self.call_view.register_dbus_actor_handle(dbus_handle.clone())?;
+        self.service_view
+            .register_dbus_actor_handle(dbus_handle.clone())?;
+        self.object_view
+            .register_dbus_actor_handle(dbus_handle.clone())?;
+        self.results_view
+            .register_dbus_actor_handle(dbus_handle.clone())?;
+        self.call_view
+            .register_dbus_actor_handle(dbus_handle.clone())?;
 
         Ok(())
     }
-    
+
     pub fn init(&mut self, size: ratatui::prelude::Size) -> Result<()> {
         self.service_view.init(size)?;
         self.object_view.init(size)?;
@@ -68,23 +84,39 @@ impl Components {
         self.bottom_text.init(size)?;
         Ok(())
     }
-    
-    pub(crate) fn set_focus(&mut self, focus: crate::app::Focus)  {
+
+    pub fn handle_key_event(&mut self, key: KeyEvent) -> Result<Vec<Action>> {
+        let actions = [
+            self.call_view.handle_key_event(key)?,
+            self.service_view.handle_key_event(key)?,
+            self.object_view.handle_key_event(key)?,
+            self.bottom_text.handle_key_event(key)?,
+            self.results_view.handle_key_event(key)?,
+        ];
+        Ok(actions.into_iter().flatten().collect()) // filter out nones
+    }
+
+    pub(crate) fn set_focus(&mut self, focus: crate::app::Focus) {
         // TODO: Make call view and maybe results activable
         match focus {
-            crate::app::Focus::Services => 
-            {
+            crate::app::Focus::Services => {
                 self.service_view.active(true);
                 self.object_view.active(false);
-            },
+                self.call_view.active(false);
+            }
             crate::app::Focus::Objects => {
                 self.service_view.active(false);
                 self.object_view.active(true);
-            },
+                self.call_view.active(false);
+            }
+            crate::app::Focus::Call => {
+                self.service_view.active(false);
+                self.object_view.active(false);
+                self.call_view.active(true);
+            }
             crate::app::Focus::All => (),
         }
     }
-    
 }
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
@@ -209,7 +241,7 @@ pub trait Component {
     /// # Returns
     ///
     /// * `Result<Option<Action>>` - An action to be processed or none.
-    /// 
+    ///
     /// TODO: Should be merged with update
     fn update_from_dbus(&mut self, dbus_action: AppMessage) -> Result<Option<Action>> {
         let _ = dbus_action; // to appease clippy

@@ -17,12 +17,11 @@ use tui_textarea::TextArea;
 use tui_tree_widget::Tree;
 use zbus::zvariant::{self};
 
-
+use crate::app2::MethodArgVisual;
 use crate::{
     app2::{App, WorkingArea},
     parser::get_parser,
 };
-use crate::app2::MethodArgVisual;
 
 fn working_area_border(app: &App, working_area: WorkingArea) -> Color {
     if app.working_area == working_area {
@@ -84,7 +83,7 @@ pub fn ui<B: Backend>(frame: &mut Frame, app: &mut App) {
     // Render a potential pop up
     if let WorkingArea::MethodCallPopUp(ref mut popup) = app.working_area {
         // TODO: Big ass block, lets refactor to smaller functions
-        let method = &popup.method_description.0;
+        let method = &popup.method_description;
 
         let bottom_text = Span::raw("Navigation: ↓ ↑ | Call: Enter | Quit: esq");
         let border_color = if popup.called {
@@ -100,8 +99,8 @@ pub fn ui<B: Backend>(frame: &mut Frame, app: &mut App) {
                     .position(Position::Bottom),
             )
             .border_style(Style::default().fg(border_color));
-        let area = centered_rect(80, 50, area);
-        let args = popup.method_description.0.args();
+        let area: Rect = centered_rect(80, 50, area);
+        let args = popup.method_description.args();
         let single_line_layout = Layout::vertical(
             repeat_n(Constraint::Length(3), args.len()).chain([Constraint::Min(1)]),
         );

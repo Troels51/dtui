@@ -7,7 +7,7 @@ use tokio::sync::mpsc::Receiver;
 use tracing::Level;
 use tui_textarea::CursorMove;
 use zbus::{
-    names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName},
+    names::{OwnedBusName, OwnedInterfaceName},
     zvariant::OwnedObjectPath,
 };
 
@@ -15,7 +15,7 @@ use crate::{
     dbus_handler::DbusActorHandle,
     messages::AppMessage,
     stateful_list::StatefulList,
-    stateful_tree::{MethodDescription, StatefulTree},
+    stateful_tree::{OwnedMethod, StatefulTree},
     ui::ui,
 };
 
@@ -29,7 +29,7 @@ pub struct MethodCallPopUp {
     pub service: OwnedBusName,
     pub object: OwnedObjectPath,
     pub interface: OwnedInterfaceName,
-    pub method_description: MethodDescription,
+    pub method_description: OwnedMethod,
     pub method_arg_vis: Vec<MethodArgVisual>,
     pub selected: usize,
     pub called: bool,
@@ -39,7 +39,7 @@ impl MethodCallPopUp {
         service: OwnedBusName,
         object: OwnedObjectPath,
         interface: OwnedInterfaceName,
-        method_description: MethodDescription,
+        method_description: OwnedMethod,
     ) -> Self {
         Self {
             service,
@@ -192,9 +192,7 @@ pub async fn run_app<B: Backend>(
                                             popup.service.clone(),
                                             popup.object.clone(),
                                             popup.interface.clone(),
-                                            OwnedMemberName::from(
-                                                popup.method_description.0.name(),
-                                            ),
+                                            popup.method_description.name().clone(),
                                             values,
                                         )
                                         .await;
@@ -267,7 +265,7 @@ pub async fn run_app<B: Backend>(
 /// Otherwise it returns None
 fn extract_description(
     selected: &[crate::stateful_tree::DbusIdentifier],
-) -> Option<(OwnedObjectPath, OwnedInterfaceName, MethodDescription)> {
+) -> Option<(OwnedObjectPath, OwnedInterfaceName, OwnedMethod)> {
     let object_path = selected
         .iter()
         .filter_map(|identifier| match identifier {
