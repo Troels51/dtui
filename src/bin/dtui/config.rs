@@ -148,6 +148,17 @@ impl<'de> Deserialize<'de> for KeyBindings {
     }
 }
 
+impl KeyBindings {
+    pub fn get_key_from_action(&self, focus: Focus, action: Action) -> Option<&Vec<KeyEvent>> {
+        self.get(&focus).and_then(|m|
+                m
+                .iter()
+                .find(|(_, value)| **value == action)
+                .map(|(key, _)| key))
+    }
+}
+
+
 fn parse_key_event(raw: &str) -> Result<KeyEvent, String> {
     let raw_lower = raw.to_ascii_lowercase();
     let (remaining, modifiers) = extract_modifiers(&raw_lower);

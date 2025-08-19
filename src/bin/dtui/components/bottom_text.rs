@@ -5,7 +5,9 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
 use crate::{
-    action::Action, app::Focus, config::Config
+    action::Action,
+    app::Focus,
+    config::{key_event_to_string, Config},
 };
 
 #[derive(Default)]
@@ -18,6 +20,16 @@ pub struct BottomText {
 impl BottomText {
     pub fn new() -> Self {
         Self::default()
+    }
+    
+    fn get_action_key(&self, focus: Focus, action: Action) -> String {
+        let next_focus_key = self
+            .config
+            .keybindings
+            .get_key_from_action(focus, action)
+            .and_then(|key_events| key_events.first()) // This takes the first key possible, so won't show all possibilities
+            .map_or("none".to_string(), |key_event| key_event.code.to_string());
+        next_focus_key
     }
 }
 
@@ -33,29 +45,22 @@ impl Component for BottomText {
     }
 
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        // TODO: Generate keybinds from config
-        let generic_keybinds = self.config.keybindings.get(&Focus::All).expect("We need to have a generic keybind");
-        // This does not generate a correct description because an action can have multiple keyevents
-        let generic_description = generic_keybinds.iter().map(|(key, action)| {
-            format!("{}: {}", action, key.iter().map(|event| event.code).join("+"))
-        }).join(" | ");
         match action {
             Action::Focus(focus) => {
-                let specific_keybinds = self.config.keybindings.get(&focus);
+                let next_focus_key = self.get_action_key(Focus::All, Action::NextFocus);
                 self.help_text = match focus {
                     crate::app::Focus::Services => {
-                        generic_description
-                        //format!("Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: Enter | Quit: Esc", "Tab")
-                    },
+                        format!("Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: {} | Quit: Esc", next_focus_key, self.get_action_key(focus, Action::GetService))
+                    }
                     crate::app::Focus::Objects => {
-                        format!("Change focus: {} | Navigation: ← ↓ ↑ → | Start Call Method: Enter | Quit: Esc", "Tab")
-                    },
+                        format!("Change focus: {} | Navigation: ← ↓ ↑ → | Invoke Dbus: {} | Quit: Esc", next_focus_key, self.get_action_key(focus, Action::InvokeDbus))
+                    }
                     crate::app::Focus::Call => {
-                        format!("Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: Enter| Quit: Esc", "Tab")
-                    },
+                        format!("Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: {} | Quit: Esc", next_focus_key, self.get_action_key(focus, Action::CallActiveMethod))
+                    }
                     crate::app::Focus::All => {
                         format!("")
-                    },
+                    }
                 };
             }
             _ => {}
@@ -65,11 +70,9 @@ impl Component for BottomText {
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         // TODO: Can this change based on the focus?
-        let bottom_text =
-            Span::raw(self.help_text.clone());
+        let bottom_text = Span::raw(self.help_text.clone());
         let helper_paragraph = Paragraph::new(bottom_text).alignment(Alignment::Center);
         frame.render_widget(helper_paragraph, area);
         Ok(())
     }
-
 }
