@@ -6,11 +6,7 @@ use zbus_names::OwnedBusName;
 
 use super::Component;
 use crate::{
-    action::Action,
-    config::Config,
-    dbus_handler::DbusActorHandle,
-    other::active_area_border_color,
-    stateful_list::StatefulList,
+    action::Action, app::Focus, config::Config, dbus_handler::DbusActorHandle, other::active_area_border_color, stateful_list::StatefulList
 };
 
 #[derive(Default)]
@@ -45,6 +41,12 @@ impl Component for ServicesView {
     }
 
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
+        match action {
+            Action::Focus(focus) => {
+                self.active = focus == Focus::Services;
+            }
+            _ => (),
+        }
         if self.active {
             match action {
                 Action::Down => {
@@ -62,12 +64,8 @@ impl Component for ServicesView {
                         }
                     }
                 }
+
                 _ => {}
-            }
-        } else {
-            // Handle actions when not focused
-            match action {
-                _ => (),
             }
         }
 
@@ -115,7 +113,4 @@ impl Component for ServicesView {
         Ok(())
     }
 
-    fn active(&mut self, active: bool) {
-        self.active = active
-    }
 }

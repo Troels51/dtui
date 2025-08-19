@@ -1,6 +1,6 @@
 #![allow(dead_code)] // Remove this once you start using the code
 
-use std::{collections::HashMap, env, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, env, fmt::Display, path::PathBuf};
 
 use color_eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -228,6 +228,7 @@ fn parse_key_code_with_modifiers(
     };
     Ok(KeyEvent::new(c, modifiers))
 }
+
 
 pub fn key_event_to_string(key_event: &KeyEvent) -> String {
     let char;

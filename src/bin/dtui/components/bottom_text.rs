@@ -1,16 +1,18 @@
 use color_eyre::Result;
+use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
 use crate::{
-    action::Action, config::Config,
+    action::Action, app::Focus, config::Config
 };
 
 #[derive(Default)]
 pub struct BottomText {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
+    help_text: String,
 }
 
 impl BottomText {
@@ -31,12 +33,30 @@ impl Component for BottomText {
     }
 
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
+        // TODO: Generate keybinds from config
+        let generic_keybinds = self.config.keybindings.get(&Focus::All).expect("We need to have a generic keybind");
+        // This does not generate a correct description because an action can have multiple keyevents
+        let generic_description = generic_keybinds.iter().map(|(key, action)| {
+            format!("{}: {}", action, key.iter().map(|event| event.code).join("+"))
+        }).join(" | ");
         match action {
-            Action::Tick => {
-                // add any logic here that should run on every tick
-            }
-            Action::Render => {
-                // add any logic here that should run on every render
+            Action::Focus(focus) => {
+                let specific_keybinds = self.config.keybindings.get(&focus);
+                self.help_text = match focus {
+                    crate::app::Focus::Services => {
+                        generic_description
+                        //format!("Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: Enter | Quit: Esc", "Tab")
+                    },
+                    crate::app::Focus::Objects => {
+                        format!("Change focus: {} | Navigation: ← ↓ ↑ → | Start Call Method: Enter | Quit: Esc", "Tab")
+                    },
+                    crate::app::Focus::Call => {
+                        format!("Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: Enter| Quit: Esc", "Tab")
+                    },
+                    crate::app::Focus::All => {
+                        format!("")
+                    },
+                };
             }
             _ => {}
         }
@@ -46,13 +66,10 @@ impl Component for BottomText {
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         // TODO: Can this change based on the focus?
         let bottom_text =
-            Span::raw("Change focus: Tab | Navigation: ← ↓ ↑ → | Get Service: Enter | Quit: q");
+            Span::raw(self.help_text.clone());
         let helper_paragraph = Paragraph::new(bottom_text).alignment(Alignment::Center);
         frame.render_widget(helper_paragraph, area);
         Ok(())
     }
 
-    fn active(&mut self, _active: bool) {
-        () // Bottom text cannot be the active component
-    }
 }

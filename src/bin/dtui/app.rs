@@ -102,8 +102,7 @@ impl App {
         self.components
             .register_config_handler(self.config.clone())?;
         self.components.init(tui.size()?)?;
-        self.components.set_focus(self.focus);
-
+        let _ = self.action_tx.send(Action::Focus(self.focus));
         let action_tx = self.action_tx.clone();
 
         self.dbus_handler.request_services().await;
@@ -198,8 +197,8 @@ impl App {
                     self.last_tick_key_events.push(key);
 
                     // Check for multi-key combinations
-                    if let Some(action) = focus_keymap.get(&self.last_tick_key_events) {
-                        info!("Got action: {action:?}");
+                    if let Some(action) = keymap.get(&self.last_tick_key_events) {
+                        info!("Multi-key action: {action:?}");
                         action_tx.send(action.clone())?;
                     }
                 }
@@ -226,13 +225,18 @@ impl App {
                 Action::Resize(w, h) => self.handle_resize(tui, w, h)?,
                 Action::Render => self.render(tui)?,
                 Action::NextFocus => {
-                    self.focus = self.focus.next();
-                    info!("next focus {:?}", self.focus);
-                    self.components.set_focus(self.focus);
+                    let next_focus = self.focus.next();
+                    info!("next focus {:?}", next_focus);
+                    let _ = self.action_tx.send(Action::Focus(next_focus));
+                },
+                Action::Focus(focus) => {
+                    info!("Setting focus {:?}", focus);
+                    self.focus = focus;
                 }
                 Action::StartDbusMethodCall(_) => {
                     self.focus = Focus::Call;
-                    self.components.set_focus(self.focus);
+                    let _ = self.action_tx.send(Action::Focus(Focus::Call));
+
                 }
                 _ => {}
             }

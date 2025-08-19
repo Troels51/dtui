@@ -96,27 +96,6 @@ impl Components {
         Ok(actions.into_iter().flatten().collect()) // filter out nones
     }
 
-    pub(crate) fn set_focus(&mut self, focus: crate::app::Focus) {
-        // TODO: Make call view and maybe results activable
-        match focus {
-            crate::app::Focus::Services => {
-                self.service_view.active(true);
-                self.object_view.active(false);
-                self.call_view.active(false);
-            }
-            crate::app::Focus::Objects => {
-                self.service_view.active(false);
-                self.object_view.active(true);
-                self.call_view.active(false);
-            }
-            crate::app::Focus::Call => {
-                self.service_view.active(false);
-                self.object_view.active(false);
-                self.call_view.active(true);
-            }
-            crate::app::Focus::All => (),
-        }
-    }
 }
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
@@ -259,6 +238,4 @@ pub trait Component {
     /// * `Result<()>` - An Ok result or an error.
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()>;
 
-    /// Set the component as active
-    fn active(&mut self, active: bool);
 }

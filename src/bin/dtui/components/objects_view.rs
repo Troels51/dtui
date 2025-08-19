@@ -8,7 +8,7 @@ use zbus_names::{OwnedBusName, OwnedInterfaceName};
 
 use super::Component;
 use crate::{
-    action::{Action, MethodCall}, config::Config, other::active_area_border_color, stateful_tree::{OwnedMethod, StatefulTree},
+    action::{Action, MethodCall}, app::Focus, config::Config, other::active_area_border_color, stateful_tree::{OwnedMethod, StatefulTree}
 };
 
 #[derive(Default)]
@@ -38,6 +38,12 @@ impl Component for ObjectsView {
     }
 
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
+        match action {
+            Action::Focus(focus) => {
+                self.active = focus == Focus::Objects;
+            },
+            _ => (),
+        }
         if self.active {
             match action {
                 Action::Up => {
@@ -65,11 +71,6 @@ impl Component for ObjectsView {
                         }
                 }
                 _ => {}
-            }
-        } else {
-            // Handle action when not in focus
-            match action {
-                _ => (),
             }
         }
 
@@ -107,9 +108,6 @@ impl Component for ObjectsView {
         Ok(())
     }
 
-    fn active(&mut self, active: bool) {
-        self.active = active
-    }
 }
 
 

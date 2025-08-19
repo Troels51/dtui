@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use strum::Display;
 use zbus_names::OwnedBusName;
 
+use crate::app::Focus;
+
 #[derive(Debug, Clone, PartialEq, Eq, Display, Serialize, Deserialize)]
 pub enum Action {
     Tick,
@@ -15,6 +17,7 @@ pub enum Action {
     Help,
 
     NextFocus,
+    Focus(Focus),
     Up,
     Down,
     DownTree, // Go further into an object tree

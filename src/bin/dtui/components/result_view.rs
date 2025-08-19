@@ -94,7 +94,4 @@ impl Component for ResultsView {
         Ok(())
     }
 
-    fn active(&mut self, active: bool) {
-        self.active = active
-    }
 }

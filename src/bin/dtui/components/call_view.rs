@@ -9,11 +9,7 @@ use tui_textarea::CursorMove;
 
 use super::Component;
 use crate::{
-    action::{Action, MethodCall},
-    config::Config,
-    dbus_handler::DbusActorHandle,
-    other::active_area_border_color,
-    parser::get_parser,
+    action::{Action, MethodCall}, app::Focus, config::Config, dbus_handler::DbusActorHandle, other::active_area_border_color, parser::get_parser
 };
 
 pub struct MethodArgVisual {
@@ -148,6 +144,12 @@ impl Component for CallView {
         Ok(())
     }
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
+        match action {
+            Action::Focus(focus) => {
+                self.active = focus == Focus::Call;
+            }
+            _ => (),
+        }
         if self.active {
             match action {
                 Action::Down => {
@@ -173,6 +175,7 @@ impl Component for CallView {
                         ongoing.selected = ongoing.selected.saturating_sub(1);
                     }
                 }
+
                 Action::CallActiveMethod => {
                     if let Some(ongoing) = &mut self.ongoing {
                         info!("Calling active method");
@@ -282,9 +285,5 @@ impl Component for CallView {
         frame.render_widget(block, area);
 
         Ok(())
-    }
-
-    fn active(&mut self, active: bool) {
-        self.active = active
     }
 }
