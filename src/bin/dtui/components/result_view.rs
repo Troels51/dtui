@@ -1,4 +1,3 @@
-
 use color_eyre::Result;
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
@@ -6,9 +5,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tui_scrollview::{ScrollView, ScrollViewState};
 
 use super::Component;
-use crate::{
-    action::Action, config::Config, other::active_area_border_color,
-};
+use crate::{action::Action, config::Config, other::active_area_border_color};
 
 #[derive(Default)]
 pub struct ResultsView {
@@ -61,13 +58,18 @@ impl Component for ResultsView {
     ) -> Result<Option<Action>> {
         match dbus_action {
             crate::messages::AppMessage::MethodCallResponse(owned_member_name, message) => {
-                    if let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>()
-                        {
-                            let value_string = value.fields().iter().map(|field| {
-                                field.to_string()
-                            }).join(",");
-                            self.results.push(format!("{}: {}", owned_member_name.to_string(), value_string));
-                        }
+                if let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>() {
+                    let value_string = value
+                        .fields()
+                        .iter()
+                        .map(|field| field.to_string())
+                        .join(",");
+                    self.results.push(format!(
+                        "{}: {}",
+                        owned_member_name.to_string(),
+                        value_string
+                    ));
+                }
             }
             _ => (),
         }
@@ -83,15 +85,16 @@ impl Component for ResultsView {
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let content = self.results.iter().join("\n");
-        // TODO: Should this really use ScrollView or maybe something simpler
+
         let mut scroll_view = ScrollView::new(inner.as_size());
         scroll_view.render_widget(
-            Paragraph::new(content).block(Block::default()).wrap(Wrap::default()),
+            Paragraph::new(content)
+                .block(Block::default())
+                .wrap(Wrap::default()),
             scroll_view.area(),
         );
         frame.render_stateful_widget(scroll_view, inner, &mut self.scroll_view_state);
 
         Ok(())
     }
-
 }

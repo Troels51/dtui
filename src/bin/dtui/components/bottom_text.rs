@@ -1,14 +1,9 @@
 use color_eyre::Result;
-use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
-use crate::{
-    action::Action,
-    app::Focus,
-    config::{key_event_to_string, Config},
-};
+use crate::{action::Action, app::Focus, config::Config};
 
 #[derive(Default)]
 pub struct BottomText {
@@ -21,7 +16,7 @@ impl BottomText {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     fn get_action_key(&self, focus: Focus, action: Action) -> String {
         let next_focus_key = self
             .config
@@ -50,13 +45,25 @@ impl Component for BottomText {
                 let next_focus_key = self.get_action_key(Focus::All, Action::NextFocus);
                 self.help_text = match focus {
                     crate::app::Focus::Services => {
-                        format!("Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: {} | Quit: Esc", next_focus_key, self.get_action_key(focus, Action::GetService))
+                        format!(
+                            "Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: {} | Quit: Esc",
+                            next_focus_key,
+                            self.get_action_key(focus, Action::GetService)
+                        )
                     }
                     crate::app::Focus::Objects => {
-                        format!("Change focus: {} | Navigation: ← ↓ ↑ → | Invoke Dbus: {} | Quit: Esc", next_focus_key, self.get_action_key(focus, Action::InvokeDbus))
+                        format!(
+                            "Change focus: {} | Navigation: ← ↓ ↑ → | Invoke Dbus: {} | Quit: Esc",
+                            next_focus_key,
+                            self.get_action_key(focus, Action::InvokeDbus)
+                        )
                     }
                     crate::app::Focus::Call => {
-                        format!("Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: {} | Quit: Esc", next_focus_key, self.get_action_key(focus, Action::CallActiveMethod))
+                        format!(
+                            "Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: {} | Quit: Esc",
+                            next_focus_key,
+                            self.get_action_key(focus, Action::CallActiveMethod)
+                        )
                     }
                     crate::app::Focus::All => {
                         format!("")
@@ -69,7 +76,6 @@ impl Component for BottomText {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        // TODO: Can this change based on the focus?
         let bottom_text = Span::raw(self.help_text.clone());
         let helper_paragraph = Paragraph::new(bottom_text).alignment(Alignment::Center);
         frame.render_widget(helper_paragraph, area);

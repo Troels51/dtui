@@ -1,6 +1,6 @@
 #![allow(dead_code)] // Remove this once you start using the code
 
-use std::{collections::{HashMap, HashSet}, env, fmt::Display, path::PathBuf};
+use std::{collections::HashMap, env, path::PathBuf};
 
 use color_eyre::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -150,14 +150,13 @@ impl<'de> Deserialize<'de> for KeyBindings {
 
 impl KeyBindings {
     pub fn get_key_from_action(&self, focus: Focus, action: Action) -> Option<&Vec<KeyEvent>> {
-        self.get(&focus).and_then(|m|
-                m
-                .iter()
+        self.get(&focus).and_then(|m| {
+            m.iter()
                 .find(|(_, value)| **value == action)
-                .map(|(key, _)| key))
+                .map(|(key, _)| key)
+        })
     }
 }
-
 
 fn parse_key_event(raw: &str) -> Result<KeyEvent, String> {
     let raw_lower = raw.to_ascii_lowercase();
@@ -239,7 +238,6 @@ fn parse_key_code_with_modifiers(
     };
     Ok(KeyEvent::new(c, modifiers))
 }
-
 
 pub fn key_event_to_string(key_event: &KeyEvent) -> String {
     let char;

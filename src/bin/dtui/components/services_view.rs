@@ -6,7 +6,8 @@ use zbus_names::OwnedBusName;
 
 use super::Component;
 use crate::{
-    action::Action, app::Focus, config::Config, dbus_handler::DbusActorHandle, other::active_area_border_color, stateful_list::StatefulList
+    action::Action, app::Focus, config::Config, dbus_handler::DbusActorHandle,
+    other::active_area_border_color, stateful_list::StatefulList,
 };
 
 #[derive(Default)]
@@ -112,5 +113,4 @@ impl Component for ServicesView {
 
         Ok(())
     }
-
 }

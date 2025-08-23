@@ -3,9 +3,7 @@ use std::{collections::HashMap, error::Error, io::BufReader};
 use async_recursion::async_recursion;
 use tokio::sync::mpsc::{self, Receiver, UnboundedSender};
 use zbus::{
-    names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName},
-    zvariant::{ObjectPath, OwnedValue, StructureBuilder},
-    Connection,
+    names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName}, zvariant::{ObjectPath, OwnedValue, Str, StructureBuilder}, Connection
 };
 use zbus_xml::Node;
 
@@ -125,6 +123,25 @@ impl DbusActor {
                     Err(e) => tracing::debug!("Method call error {}", e),
                 };
             }
+            DbusMessage::Invoke(invocation) => {
+                match &invocation.invocation_description {
+                    // TODO: Get this to work
+                    crate::action::InvokableDbusMember::Method { method } => {}
+                    crate::action::InvokableDbusMember::Property { property } => {
+                        let response = self
+                            .connection
+                            .call_method(
+                                Some(invocation.service),
+                                invocation.object,
+                                Some("org.freedesktop.DBus.Properties"),
+                                "Get",
+                                &(),
+                            )
+                            .await;
+                    }
+                    crate::action::InvokableDbusMember::Signal { name } => {}
+                }
+            }
         }
     }
 }
@@ -153,22 +170,12 @@ impl DbusActorHandle {
         let msg = DbusMessage::GetObjects(object);
         let _ = self.sender.send(msg).await;
     }
-    pub fn sync_request_objects_from(&self, object: OwnedBusName) {
-        let msg = DbusMessage::GetObjects(object);
-        tracing::info!(" msg {:?}", msg);
-
-        let e = self.sender.blocking_send(msg);
-        tracing::info!(" sync error {:?}", e);
-    }
 
     pub async fn request_services(&self) {
         let msg = DbusMessage::ServiceRequest();
         let _ = self.sender.send(msg).await;
     }
-    pub fn sync_request_services(&self) {
-        let msg = DbusMessage::ServiceRequest();
-        let _ = self.sender.blocking_send(msg);
-    }
+
     pub async fn call_method(
         &self,
         service: OwnedBusName,
@@ -180,15 +187,29 @@ impl DbusActorHandle {
         let msg = DbusMessage::MethodCallRequest(service, object, interface, method, values);
         let _ = self.sender.send(msg).await;
     }
-    pub fn sync_call_method(
+
+    pub async fn get_property(
         &self,
         service: OwnedBusName,
         object: zbus::zvariant::OwnedObjectPath,
         interface: OwnedInterfaceName,
-        method: OwnedMemberName,
-        values: Vec<OwnedValue>,
+        property_name: String,
     ) {
-        let msg = DbusMessage::MethodCallRequest(service, object, interface, method, values);
-        let _ = self.sender.blocking_send(msg);
+        let property_interface = OwnedInterfaceName::try_from("org.freedesktop.DBus.Properties")
+            .expect("org.freedesktop.Dbus.Properties is valid interface name");
+        let method = OwnedMemberName::try_from("Get").expect("Get is a valid Method");
+        let mut values: Vec<zbus::zvariant::OwnedValue> = Vec::new();
+        values.push(OwnedValue::try_from(interface.clone()).expect("OwnedInterfaceName is valid value"));
+        values.push(OwnedValue::from(Str::from(property_name)));
+
+        let msg = DbusMessage::MethodCallRequest(
+            service,
+            object,
+            property_interface,
+            method,
+            values,
+        );
+        let _ = self.sender.send(msg).await;
+
     }
 }

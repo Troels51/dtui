@@ -95,7 +95,6 @@ impl Components {
         ];
         Ok(actions.into_iter().flatten().collect()) // filter out nones
     }
-
 }
 
 /// `Component` is a trait that represents a visual and interactive element of the user interface.
@@ -221,7 +220,6 @@ pub trait Component {
     ///
     /// * `Result<Option<Action>>` - An action to be processed or none.
     ///
-    /// TODO: Should be merged with update
     fn update_from_dbus(&mut self, dbus_action: AppMessage) -> Result<Option<Action>> {
         let _ = dbus_action; // to appease clippy
         Ok(None)
@@ -237,5 +235,4 @@ pub trait Component {
     ///
     /// * `Result<()>` - An Ok result or an error.
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()>;
-
 }

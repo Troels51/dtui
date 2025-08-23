@@ -19,26 +19,30 @@ pub enum MemberTypes {
 //    > Methods/Properties/Signals (The actual list of the methods)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DbusIdentifier {
-    Object(String),            // ObjectPath
-    Interface(String),         // InterfaceName
-    Member(MemberTypes),       // Can be Method, Properties, Signals
+    Object(String),      // ObjectPath
+    Interface(String),   // InterfaceName
+    Member(MemberTypes), // Can be Method, Properties, Signals
     Method(OwnedMethod), // zbus_name::MemberName
-    Property(String),          // zbus_name::PropertyName
-    Signal(String),            // zbus_name::MemberName
+    Property(String),    // zbus_name::PropertyName
+    Signal(String),      // zbus_name::MemberName
 }
 
-
+// OwnedMethod is zbus_xml::Method but owned
 //TODO: Consider moving getting this or something similar into zbus_xml
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OwnedMethod {
     name: OwnedMemberName,
     args: Vec<Arg>,
-    annotations: Vec<Annotation>
+    annotations: Vec<Annotation>,
 }
 
 impl From<Method<'_>> for OwnedMethod {
     fn from(value: Method<'_>) -> Self {
-        OwnedMethod { name: value.name().to_owned().into(), args: value.args().to_owned(), annotations: value.annotations().to_owned() }
+        OwnedMethod {
+            name: value.name().to_owned().into(),
+            args: value.args().to_owned(),
+            annotations: value.annotations().to_owned(),
+        }
     }
 }
 
@@ -53,7 +57,6 @@ impl OwnedMethod {
         &self.annotations
     }
 }
-
 
 // Rely on PartialEq
 impl Eq for OwnedMethod {}
@@ -173,10 +176,7 @@ fn node_to_treeitems(node: &zbus_xml::Node<'static>) -> Vec<TreeItem<'static, Db
                         return_arrow,
                         outputs.join(", ")
                     );
-                    TreeItem::new_leaf(
-                        DbusIdentifier::Method(method.into()),
-                        leaf_string,
-                    )
+                    TreeItem::new_leaf(DbusIdentifier::Method(method.into()), leaf_string)
                 })
                 .collect();
             let properties: Vec<TreeItem<DbusIdentifier>> = interface

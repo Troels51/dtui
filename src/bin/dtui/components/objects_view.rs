@@ -3,12 +3,12 @@ use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::info;
 use tui_tree_widget::Tree;
-use zbus::zvariant::OwnedObjectPath;
-use zbus_names::{OwnedBusName, OwnedInterfaceName};
+use zbus::zvariant::{dbus, OwnedObjectPath};
+use zbus_names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName, OwnedPropertyName};
 
 use super::Component;
 use crate::{
-    action::{Action, MethodCall}, app::Focus, config::Config, other::active_area_border_color, stateful_tree::{OwnedMethod, StatefulTree}
+    action::{Action, Invocation}, app::Focus, config::Config, dbus_handler::DbusActorHandle, other::active_area_border_color, stateful_tree::{self, OwnedMethod, StatefulTree}
 };
 
 #[derive(Default)]
@@ -17,6 +17,7 @@ pub struct ObjectsView {
     config: Config,
     objects: StatefulTree,
     originating_service: Option<OwnedBusName>,
+    dbus_actor_handle: Option<DbusActorHandle>,
     active: bool,
 }
 
@@ -36,12 +37,15 @@ impl Component for ObjectsView {
         self.config = config;
         Ok(())
     }
-
+    fn register_dbus_actor_handle(&mut self, dbus_actor_handle: DbusActorHandle) -> Result<()> {
+        self.dbus_actor_handle = Some(dbus_actor_handle);
+        Ok(())
+    }
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
         match action {
             Action::Focus(focus) => {
                 self.active = focus == Focus::Objects;
-            },
+            }
             _ => (),
         }
         if self.active {
@@ -59,16 +63,29 @@ impl Component for ObjectsView {
                     self.objects.left();
                 }
                 Action::InvokeDbus => {
-                    info!("Invoking dbus method or property {:?}", self.objects.state.selected());
-                    if let Some(full_description) = extract_description(self.objects.state.selected())
-                        {
-                            return Ok(Some(Action::StartDbusMethodCall(MethodCall{
-                                service: self.originating_service.clone().expect("Must have an originating service if an object is being selected"),
-                                object: full_description.0,
-                                interface: full_description.1,
-                                method_description: full_description.2,
-                            })));
+                    info!(
+                        "Invoking dbus method or property {:?}",
+                        self.objects.state.selected()
+                    );
+                    if let Some(originating_service) = &self.originating_service {
+                        let selected = self.objects.state.selected();
+                        let invokable = extract_invokable(originating_service.clone(), selected);
+                        if let Some(invokable) = invokable {
+                            match &invokable.invocation_description {
+                                crate::action::InvokableDbusMember::Method { method } => {
+                                    return Ok(Some(Action::StartDbusInvocation(invokable)));
+                                },
+                                crate::action::InvokableDbusMember::Property { property } => {
+                                    let dbus_actor = self.dbus_actor_handle.clone().expect("Component needs dbus handle");
+                                    dbus_actor.get_property(invokable.service, invokable.object, invokable.interface, property.as_str().to_string()).await;
+                                    return Ok(None)
+                                },
+                                crate::action::InvokableDbusMember::Signal { name } => {
+                                    return Ok(None)
+                                },
+                            }
                         }
+                    }
                 }
                 _ => {}
             }
@@ -107,44 +124,59 @@ impl Component for ObjectsView {
         frame.render_stateful_widget(objects_view, area, &mut self.objects.state);
         Ok(())
     }
-
 }
 
-
-
-/// Takes a stateful_tree::DbusIdentifier, which is an identifier for where a node is in the UI tree
-/// and if the selection is a method, it will extract the path, interface name and method description
-/// Otherwise it returns None
-fn extract_description(
+fn extract_invokable(
+    current_service: OwnedBusName,
     selected: &[crate::stateful_tree::DbusIdentifier],
-) -> Option<(OwnedObjectPath, OwnedInterfaceName, OwnedMethod)> {
-    let object_path = selected
-        .iter()
-        .filter_map(|identifier| match identifier {
-            crate::stateful_tree::DbusIdentifier::Object(o) => Some(o),
-            _ => None,
-        })
-        .next();
-    let interface_name = selected
-        .iter()
-        .filter_map(|identifier| match identifier {
-            crate::stateful_tree::DbusIdentifier::Interface(i) => Some(i),
-            _ => None,
-        })
-        .next();
-    let member_name = selected
-        .iter()
-        .filter_map(|identifier| match identifier {
-            crate::stateful_tree::DbusIdentifier::Method(m) => Some(m),
-            _ => None,
-        })
-        .next();
-    if object_path.is_some() && interface_name.is_some() && member_name.is_some() {
-        Some((
-            OwnedObjectPath::try_from(object_path.unwrap().clone()).unwrap(),
-            OwnedInterfaceName::try_from(interface_name.unwrap().clone()).unwrap(),
-            member_name.unwrap().clone(),
-        ))
+) -> Option<Invocation> {
+    let mut selected_iter = selected.iter();
+    if let Some(stateful_tree::DbusIdentifier::Object(path)) = selected_iter.next()
+        && let Some(stateful_tree::DbusIdentifier::Interface(interface)) = selected_iter.next()
+        && let Some(stateful_tree::DbusIdentifier::Member(member_type)) = selected_iter.next()
+    {
+        let path = OwnedObjectPath::try_from(path.clone()).unwrap();
+        let interface = OwnedInterfaceName::try_from(interface.clone()).unwrap();
+        if let Some(invokable) = match member_type {
+            stateful_tree::MemberTypes::Methods => {
+                if let Some(stateful_tree::DbusIdentifier::Method(method)) = selected_iter.next() {
+                    Some(crate::action::InvokableDbusMember::Method {
+                        method: method.clone(),
+                    })
+                } else {
+                    None
+                }
+            }
+            stateful_tree::MemberTypes::Properties => {
+                if let Some(stateful_tree::DbusIdentifier::Property(property)) =
+                    selected_iter.next()
+                {
+                    Some(crate::action::InvokableDbusMember::Property {
+                        property: OwnedPropertyName::try_from(property.clone()).unwrap(),
+                    })
+                } else {
+                    None
+                }
+            }
+            stateful_tree::MemberTypes::Signals => {
+                if let Some(stateful_tree::DbusIdentifier::Signal(signal)) = selected_iter.next() {
+                    Some(crate::action::InvokableDbusMember::Signal {
+                        name: OwnedMemberName::try_from(signal.clone()).unwrap(),
+                    })
+                } else {
+                    None
+                }
+            }
+        } {
+            Some(Invocation {
+                service: current_service,
+                object: path,
+                interface: interface,
+                invocation_description: invokable,
+            })
+        } else {
+            None
+        }
     } else {
         None
     }

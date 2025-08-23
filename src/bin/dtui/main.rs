@@ -1,6 +1,5 @@
 mod action;
 mod app;
-pub mod app2;
 mod components;
 mod config;
 pub mod dbus_handler;
@@ -12,14 +11,11 @@ pub mod parser;
 pub mod stateful_list;
 pub mod stateful_tree;
 mod tui;
-pub mod ui;
 
 use clap::{command, ArgGroup, Parser, ValueEnum};
 
-
 use std::error::Error;
 use tracing::level_filters::LevelFilter;
-
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 enum BusType {

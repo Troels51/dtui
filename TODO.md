@@ -1,3 +1,3 @@
 TODO:
-Needs to write the helps and the bottom text
+Create a help pop up
 Get properties

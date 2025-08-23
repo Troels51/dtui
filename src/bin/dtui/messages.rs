@@ -6,6 +6,8 @@ use zbus::{
 };
 use zbus_xml::Node;
 
+use crate::action::Invocation;
+
 #[derive(Debug)]
 pub enum DbusMessage {
     GetObjects(OwnedBusName),
@@ -17,6 +19,7 @@ pub enum DbusMessage {
         OwnedMemberName,
         Vec<OwnedValue>,
     ),
+    Invoke(Invocation)
 }
 /// Message from the Dbus Actor to the App.
 /// TODO: Needs better name, or it needs to be refactored into Action

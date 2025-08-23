@@ -9,7 +9,12 @@ use tui_textarea::CursorMove;
 
 use super::Component;
 use crate::{
-    action::{Action, MethodCall}, app::Focus, config::Config, dbus_handler::DbusActorHandle, other::active_area_border_color, parser::get_parser
+    action::{Action, Invocation, InvokableDbusMember},
+    app::Focus,
+    config::Config,
+    dbus_handler::DbusActorHandle,
+    other::active_area_border_color,
+    parser::get_parser,
 };
 
 pub struct MethodArgVisual {
@@ -27,19 +32,21 @@ struct OngoingCallInfo {
     method_description: crate::stateful_tree::OwnedMethod,
     method_arg_vis: Vec<MethodArgVisual>,
     selected: usize,
-    called: bool,
 }
 
 impl OngoingCallInfo {
-    fn new(call: MethodCall) -> OngoingCallInfo {
-        OngoingCallInfo {
-            service: call.service,
-            object: call.object,
-            interface: call.interface,
-            method_description: call.method_description,
-            method_arg_vis: vec![],
-            selected: 0,
-            called: false,
+    fn new(call: Invocation) -> Option<OngoingCallInfo> {
+        if let InvokableDbusMember::Method { method } = call.invocation_description {
+            Some(OngoingCallInfo {
+                service: call.service,
+                object: call.object,
+                interface: call.interface,
+                method_description: method,
+                method_arg_vis: vec![],
+                selected: 0,
+            })
+        } else {
+            None
         }
     }
 }
@@ -167,7 +174,7 @@ impl Component for CallView {
                             })
                             .count();
                         ongoing.selected =
-                            std::cmp::min(input_count - 1, ongoing.selected + 1);
+                            std::cmp::min(input_count.saturating_sub(1), ongoing.selected + 1);
                     }
                 }
                 Action::Up => {
@@ -215,8 +222,8 @@ impl Component for CallView {
         }
         // Handle irregardless of active
         match action {
-            Action::StartDbusMethodCall(method_call) => {
-                self.ongoing = Some(OngoingCallInfo::new(method_call));
+            Action::StartDbusInvocation(method_call) => {
+                self.ongoing = OngoingCallInfo::new(method_call);
             }
             _ => (),
         }

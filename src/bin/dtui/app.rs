@@ -7,18 +7,16 @@ use ratatui::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::info;
-use zbus::{conn, Connection};
+use zbus::{Connection, conn};
 
 use crate::{
+    Args, BusType,
     action::Action,
-    components::{
-        Component, Components,
-    },
+    components::{Component, Components},
     config::Config,
     dbus_handler::DbusActorHandle,
     messages::AppMessage,
     tui::{Event, Tui},
-    Args, BusType,
 };
 
 pub struct App {
@@ -204,7 +202,6 @@ impl App {
                 }
             }
         }
-        // TODO: Send key event to components
 
         Ok(())
     }
@@ -228,15 +225,20 @@ impl App {
                     let next_focus = self.focus.next();
                     info!("next focus {:?}", next_focus);
                     let _ = self.action_tx.send(Action::Focus(next_focus));
-                },
+                }
                 Action::Focus(focus) => {
                     info!("Setting focus {:?}", focus);
                     self.focus = focus;
                 }
-                Action::StartDbusMethodCall(_) => {
-                    self.focus = Focus::Call;
-                    let _ = self.action_tx.send(Action::Focus(Focus::Call));
-
+                Action::StartDbusInvocation(ref invocation) => {
+                    match &invocation.invocation_description {
+                        crate::action::InvokableDbusMember::Method { method } => {
+                            self.focus = Focus::Call;
+                            let _ = self.action_tx.send(Action::Focus(Focus::Call));
+                        }
+                        crate::action::InvokableDbusMember::Property { property } => {}
+                        crate::action::InvokableDbusMember::Signal { name } => {}
+                    }
                 }
                 _ => {}
             }
@@ -373,10 +375,7 @@ impl App {
             {
                 self.action_tx.send(action)?
             };
-            if let Some(action) = self
-                .components
-                .call_view
-                .update_from_dbus(action.clone())? {
+            if let Some(action) = self.components.call_view.update_from_dbus(action.clone())? {
                 self.action_tx.send(action)?
             };
         }
