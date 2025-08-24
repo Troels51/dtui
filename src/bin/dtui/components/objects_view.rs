@@ -3,12 +3,12 @@ use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::info;
 use tui_tree_widget::Tree;
-use zbus::zvariant::{dbus, OwnedObjectPath};
+use zbus::zvariant::OwnedObjectPath;
 use zbus_names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName, OwnedPropertyName};
 
 use super::Component;
 use crate::{
-    action::{Action, Invocation}, app::Focus, config::Config, dbus_handler::DbusActorHandle, other::active_area_border_color, stateful_tree::{self, OwnedMethod, StatefulTree}
+    action::{Action, Invocation}, app::Focus, config::Config, dbus_handler::DbusActorHandle, other::active_area_border_color, stateful_tree::{self, StatefulTree}
 };
 
 #[derive(Default)]
@@ -42,11 +42,8 @@ impl Component for ObjectsView {
         Ok(())
     }
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Focus(focus) => {
-                self.active = focus == Focus::Objects;
-            }
-            _ => (),
+        if let Action::Focus(focus) = action {
+            self.active = focus == Focus::Objects;
         }
         if self.active {
             match action {
@@ -137,7 +134,7 @@ fn extract_invokable(
     {
         let path = OwnedObjectPath::try_from(path.clone()).unwrap();
         let interface = OwnedInterfaceName::try_from(interface.clone()).unwrap();
-        if let Some(invokable) = match member_type {
+        match member_type {
             stateful_tree::MemberTypes::Methods => {
                 if let Some(stateful_tree::DbusIdentifier::Method(method)) = selected_iter.next() {
                     Some(crate::action::InvokableDbusMember::Method {
@@ -167,16 +164,12 @@ fn extract_invokable(
                     None
                 }
             }
-        } {
-            Some(Invocation {
+        }.map(|invokable| Invocation {
                 service: current_service,
                 object: path,
-                interface: interface,
+                interface,
                 invocation_description: invokable,
             })
-        } else {
-            None
-        }
     } else {
         None
     }

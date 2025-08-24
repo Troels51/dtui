@@ -2,7 +2,6 @@ use color_eyre::Result;
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
-use tui_scrollview::{ScrollView, ScrollViewState};
 
 use super::Component;
 use crate::{
@@ -47,9 +46,7 @@ impl Component for ResultsView {
             }
         } else {
             // Handle action when not in focus
-            match action {
-                _ => (),
-            }
+            
         }
 
         Ok(None)
@@ -58,11 +55,8 @@ impl Component for ResultsView {
         &mut self,
         dbus_action: crate::messages::AppMessage,
     ) -> Result<Option<Action>> {
-        match dbus_action {
-            crate::messages::AppMessage::InvocationResponse(response) => {
-                self.results.push(response);
-            }
-            _ => (),
+        if let crate::messages::AppMessage::InvocationResponse(response) = dbus_action {
+            self.results.push(response);
         }
         Ok(None)
     }

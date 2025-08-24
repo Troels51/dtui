@@ -41,11 +41,8 @@ impl Component for ServicesView {
     }
 
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Focus(focus) => {
-                self.active = focus == Focus::Services;
-            }
-            _ => (),
+        if let Action::Focus(focus) = action {
+            self.active = focus == Focus::Services;
         }
         if self.active {
             match action {
@@ -58,10 +55,7 @@ impl Component for ServicesView {
                 Action::GetService => {
                     if let Some(selected_index) = self.services.state.selected() {
                         let item = self.services.items[selected_index].clone();
-                        match &self.dbus_actor_handle {
-                            Some(handle) => handle.request_objects_from(item).await,
-                            None => (),
-                        }
+                        if let Some(handle) = &self.dbus_actor_handle { handle.request_objects_from(item).await }
                     }
                 }
 

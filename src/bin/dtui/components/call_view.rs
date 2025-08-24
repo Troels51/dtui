@@ -146,11 +146,8 @@ impl Component for CallView {
         Ok(())
     }
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Focus(focus) => {
-                self.active = focus == Focus::Call;
-            }
-            _ => (),
+        if let Action::Focus(focus) = action {
+            self.active = focus == Focus::Call;
         }
         if self.active {
             match action {
@@ -216,11 +213,8 @@ impl Component for CallView {
             }
         }
         // Handle irregardless of active
-        match action {
-            Action::StartDbusInvocation(method_call) => {
-                self.ongoing = OngoingCallInfo::new(method_call);
-            }
-            _ => (),
+        if let Action::StartDbusInvocation(method_call) = action {
+            self.ongoing = OngoingCallInfo::new(method_call);
         }
         Ok(None)
     }
@@ -250,26 +244,22 @@ impl Component for CallView {
         &mut self,
         dbus_action: crate::messages::AppMessage,
     ) -> Result<Option<Action>> {
-        match dbus_action {
-            crate::messages::AppMessage::InvocationResponse(InvocationResponse{method_name, message, ..}) => {
-                if let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>() {
-                    if let Some(ref mut ongoing) = self.ongoing {
-                        for (index, output_field) in ongoing
-                            .method_arg_vis
-                            .iter_mut()
-                            .filter(|field| !field.is_input)
-                            .enumerate()
-                        {
-                            output_field.text_area.move_cursor(CursorMove::Head);
-                            output_field.text_area.delete_line_by_end(); // The way to clear a text area
-                            output_field
-                                .text_area
-                                .insert_str(format!("{}", value.fields()[index]));
-                        }
+        if let crate::messages::AppMessage::InvocationResponse(InvocationResponse{method_name, message, ..}) = dbus_action {
+            if let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>()
+                && let Some(ref mut ongoing) = self.ongoing {
+                    for (index, output_field) in ongoing
+                        .method_arg_vis
+                        .iter_mut()
+                        .filter(|field| !field.is_input)
+                        .enumerate()
+                    {
+                        output_field.text_area.move_cursor(CursorMove::Head);
+                        output_field.text_area.delete_line_by_end(); // The way to clear a text area
+                        output_field
+                            .text_area
+                            .insert_str(format!("{}", value.fields()[index]));
                     }
                 }
-            }
-            _ => (),
         }
         Ok(None)
     }

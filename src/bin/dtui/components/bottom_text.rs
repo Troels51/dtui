@@ -18,13 +18,13 @@ impl BottomText {
     }
 
     fn get_action_key(&self, focus: Focus, action: Action) -> String {
-        let next_focus_key = self
+        
+        self
             .config
             .keybindings
             .get_key_from_action(focus, action)
             .and_then(|key_events| key_events.first()) // This takes the first key possible, so won't show all possibilities
-            .map_or("none".to_string(), |key_event| key_event.code.to_string());
-        next_focus_key
+            .map_or("none".to_string(), |key_event| key_event.code.to_string())
     }
 }
 
@@ -40,37 +40,34 @@ impl Component for BottomText {
     }
 
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
-        match action {
-            Action::Focus(focus) => {
-                let next_focus_key = self.get_action_key(Focus::All, Action::NextFocus);
-                self.help_text = match focus {
-                    crate::app::Focus::Services => {
-                        format!(
-                            "Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: {} | Quit: Esc",
-                            next_focus_key,
-                            self.get_action_key(focus, Action::GetService)
-                        )
-                    }
-                    crate::app::Focus::Objects => {
-                        format!(
-                            "Change focus: {} | Navigation: ← ↓ ↑ → | Invoke Dbus: {} | Quit: Esc",
-                            next_focus_key,
-                            self.get_action_key(focus, Action::InvokeDbus)
-                        )
-                    }
-                    crate::app::Focus::Call => {
-                        format!(
-                            "Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: {} | Quit: Esc",
-                            next_focus_key,
-                            self.get_action_key(focus, Action::CallActiveMethod)
-                        )
-                    }
-                    crate::app::Focus::All => {
-                        format!("")
-                    }
-                };
-            }
-            _ => {}
+        if let Action::Focus(focus) = action {
+            let next_focus_key = self.get_action_key(Focus::All, Action::NextFocus);
+            self.help_text = match focus {
+                crate::app::Focus::Services => {
+                    format!(
+                        "Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: {} | Quit: Esc",
+                        next_focus_key,
+                        self.get_action_key(focus, Action::GetService)
+                    )
+                }
+                crate::app::Focus::Objects => {
+                    format!(
+                        "Change focus: {} | Navigation: ← ↓ ↑ → | Invoke Dbus: {} | Quit: Esc",
+                        next_focus_key,
+                        self.get_action_key(focus, Action::InvokeDbus)
+                    )
+                }
+                crate::app::Focus::Call => {
+                    format!(
+                        "Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: {} | Quit: Esc",
+                        next_focus_key,
+                        self.get_action_key(focus, Action::CallActiveMethod)
+                    )
+                }
+                crate::app::Focus::All => {
+                    String::new()
+                }
+            };
         }
         Ok(None)
     }
