@@ -104,7 +104,7 @@ impl Component for ObjectsView {
                 self.objects = StatefulTree::from_nodes(objects);
             }
             crate::messages::AppMessage::Services(owned_bus_names) => (),
-            crate::messages::AppMessage::MethodCallResponse(owned_member_name, message) => {}
+            crate::messages::AppMessage::InvocationResponse{..} => {}
         }
         Ok(None)
     }

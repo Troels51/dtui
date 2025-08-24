@@ -7,7 +7,7 @@ use zbus::{
 };
 use zbus_xml::Node;
 
-use crate::messages::{AppMessage, DbusMessage};
+use crate::messages::{AppMessage, DbusMessage, InvocationResponse};
 
 pub struct DbusActor {
     app_sender: UnboundedSender<AppMessage>,
@@ -96,9 +96,9 @@ impl DbusActor {
                 let method_call_response = if !is_empty {
                     self.connection
                         .call_method(
-                            Some(service),
-                            object_path,
-                            Some(interface),
+                            Some(service.clone()),
+                            object_path.clone(),
+                            Some(interface.clone()),
                             method.clone(),
                             &body.build().unwrap(),
                         )
@@ -106,9 +106,9 @@ impl DbusActor {
                 } else {
                     self.connection
                         .call_method(
-                            Some(service),
-                            object_path,
-                            Some(interface),
+                            Some(service.clone()),
+                            object_path.clone(),
+                            Some(interface.clone()),
                             method.clone(),
                             &(),
                         )
@@ -118,7 +118,7 @@ impl DbusActor {
                     Ok(message) => {
                         let _ = self
                             .app_sender
-                            .send(AppMessage::MethodCallResponse(method, message));
+                            .send(AppMessage::InvocationResponse(InvocationResponse{service, object_path, method_name: method, interface, message}));
                     }
                     Err(e) => tracing::debug!("Method call error {}", e),
                 };
@@ -210,6 +210,5 @@ impl DbusActorHandle {
             values,
         );
         let _ = self.sender.send(msg).await;
-
     }
 }

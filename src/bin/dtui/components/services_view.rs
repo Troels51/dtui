@@ -6,8 +6,7 @@ use zbus_names::OwnedBusName;
 
 use super::Component;
 use crate::{
-    action::Action, app::Focus, config::Config, dbus_handler::DbusActorHandle,
-    other::active_area_border_color, stateful_list::StatefulList,
+    action::Action, app::Focus, config::Config, dbus_handler::DbusActorHandle, messages::InvocationResponse, other::active_area_border_color, stateful_list::StatefulList
 };
 
 #[derive(Default)]
@@ -84,7 +83,7 @@ impl Component for ServicesView {
 
                 self.services = StatefulList::with_items(owned_bus_names);
             }
-            crate::messages::AppMessage::MethodCallResponse(owned_member_name, message) => {}
+            crate::messages::AppMessage::InvocationResponse(InvocationResponse{..}) => {}
         }
         Ok(None)
     }

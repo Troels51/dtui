@@ -19,13 +19,23 @@ pub enum DbusMessage {
         OwnedMemberName,
         Vec<OwnedValue>,
     ),
-    Invoke(Invocation)
+    Invoke(Invocation),
 }
+
+#[derive(Debug, Clone)]
+pub struct InvocationResponse {
+    pub service: OwnedBusName,
+    pub object_path: OwnedObjectPath,
+    pub interface: OwnedInterfaceName,
+    pub method_name: OwnedMemberName,
+    pub message: zbus::Message,
+}
+
 /// Message from the Dbus Actor to the App.
 /// TODO: Needs better name, or it needs to be refactored into Action
 #[derive(Debug, Clone)]
 pub enum AppMessage {
     Objects((OwnedBusName, HashMap<String, Node<'static>>)), // Service name + Map of (Object names, node)
     Services(Vec<OwnedBusName>),
-    MethodCallResponse(OwnedMemberName, zbus::Message),
+    InvocationResponse(InvocationResponse),
 }

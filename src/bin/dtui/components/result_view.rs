@@ -5,15 +5,17 @@ use tokio::sync::mpsc::UnboundedSender;
 use tui_scrollview::{ScrollView, ScrollViewState};
 
 use super::Component;
-use crate::{action::Action, config::Config, other::active_area_border_color};
+use crate::{
+    action::Action, config::Config, messages::InvocationResponse, other::active_area_border_color,
+};
 
 #[derive(Default)]
 pub struct ResultsView {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
     active: bool,
-    scroll_view_state: ScrollViewState,
-    results: Vec<String>,
+    table_state: TableState,
+    results: Vec<InvocationResponse>,
 }
 
 impl ResultsView {
@@ -57,25 +59,13 @@ impl Component for ResultsView {
         dbus_action: crate::messages::AppMessage,
     ) -> Result<Option<Action>> {
         match dbus_action {
-            crate::messages::AppMessage::MethodCallResponse(owned_member_name, message) => {
-                if let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>() {
-                    let value_string = value
-                        .fields()
-                        .iter()
-                        .map(|field| field.to_string())
-                        .join(",");
-                    self.results.push(format!(
-                        "{}: {}",
-                        owned_member_name.to_string(),
-                        value_string
-                    ));
-                }
+            crate::messages::AppMessage::InvocationResponse(response) => {
+                self.results.push(response);
             }
             _ => (),
         }
         Ok(None)
     }
-
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
         let block = Block::default()
             .borders(Borders::ALL)
@@ -84,16 +74,48 @@ impl Component for ResultsView {
             .border_style(Style::default().fg(active_area_border_color(self.active)));
         let inner = block.inner(area);
         frame.render_widget(block, area);
-        let content = self.results.iter().join("\n");
 
-        let mut scroll_view = ScrollView::new(inner.as_size());
-        scroll_view.render_widget(
-            Paragraph::new(content)
-                .block(Block::default())
-                .wrap(Wrap::default()),
-            scroll_view.area(),
+        let rows = self.results.iter().map(
+            |InvocationResponse {
+                 service,
+                 object_path,
+                 interface,
+                 method_name,
+                 message,
+             }| {
+                let message_string = if let Ok(message) =
+                    message.body().deserialize::<zbus::zvariant::Structure>()
+                {
+                    message
+                        .fields()
+                        .iter()
+                        .map(|field| field.to_string())
+                        .join(",")
+                } else {
+                    "".to_string()
+                };
+
+                Row::new(vec![
+                    service.to_string(),
+                    object_path.to_string(),
+                    interface.to_string(),
+                    method_name.to_string(),
+                    message_string,
+                ])
+            },
         );
-        frame.render_stateful_widget(scroll_view, inner, &mut self.scroll_view_state);
+        let widths = [
+            Constraint::Min(5),
+            Constraint::Min(5),
+            Constraint::Min(5),
+            Constraint::Min(5),
+            Constraint::Min(10),
+        ];
+
+        let table = Table::new(rows, widths).flex(layout::Flex::Start).header(Row::new(vec![
+            "service", "object path", "interface", "method", "result"
+        ]));
+        frame.render_stateful_widget(table, inner, &mut self.table_state);
 
         Ok(())
     }

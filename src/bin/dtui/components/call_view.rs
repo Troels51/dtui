@@ -9,12 +9,7 @@ use tui_textarea::CursorMove;
 
 use super::Component;
 use crate::{
-    action::{Action, Invocation, InvokableDbusMember},
-    app::Focus,
-    config::Config,
-    dbus_handler::DbusActorHandle,
-    other::active_area_border_color,
-    parser::get_parser,
+    action::{Action, Invocation, InvokableDbusMember}, app::Focus, config::Config, dbus_handler::DbusActorHandle, messages::InvocationResponse, other::active_area_border_color, parser::get_parser
 };
 
 pub struct MethodArgVisual {
@@ -256,7 +251,7 @@ impl Component for CallView {
         dbus_action: crate::messages::AppMessage,
     ) -> Result<Option<Action>> {
         match dbus_action {
-            crate::messages::AppMessage::MethodCallResponse(owned_member_name, message) => {
+            crate::messages::AppMessage::InvocationResponse(InvocationResponse{method_name, message, ..}) => {
                 if let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>() {
                     if let Some(ref mut ongoing) = self.ongoing {
                         for (index, output_field) in ongoing
