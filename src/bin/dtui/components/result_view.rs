@@ -13,7 +13,7 @@ pub struct ResultsView {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
     active: bool,
-    table_state: TableState,
+    list_state: ListState,
     results: Vec<InvocationResponse>,
 }
 
@@ -69,48 +69,32 @@ impl Component for ResultsView {
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        let rows = self.results.iter().map(
-            |InvocationResponse {
-                 service,
-                 object_path,
-                 interface,
-                 method_name,
-                 message,
-             }| {
-                let message_string = if let Ok(message) =
-                    message.body().deserialize::<zbus::zvariant::Structure>()
-                {
-                    message
-                        .fields()
-                        .iter()
-                        .map(|field| field.to_string())
-                        .join(",")
-                } else {
-                    "".to_string()
-                };
-
-                Row::new(vec![
-                    service.to_string(),
-                    object_path.to_string(),
-                    interface.to_string(),
-                    method_name.to_string(),
-                    message_string,
-                ])
-            },
-        );
-        let widths = [
-            Constraint::Min(5),
-            Constraint::Min(5),
-            Constraint::Min(5),
-            Constraint::Min(5),
-            Constraint::Min(10),
-        ];
-
-        let table = Table::new(rows, widths).flex(layout::Flex::Start).header(Row::new(vec![
-            "service", "object path", "interface", "method", "result"
-        ]));
-        frame.render_stateful_widget(table, inner, &mut self.table_state);
+        let list = List::new(&self.results);
+        frame.render_stateful_widget(list, inner, &mut self.list_state);
 
         Ok(())
+    }
+}
+
+fn dbus_result_to_string(message: &zbus::Message) -> String {
+    let message_string = if let Ok(message) =
+        message.body().deserialize::<zbus::zvariant::Structure>()
+    {
+        message
+            .fields()
+            .iter()
+            .map(|field| field.to_string())
+            .join(",")
+    } else {
+        "".to_string()
+    };
+    message_string
+}
+
+const RESULT_STYLE: Style = Style::new();
+
+impl From<&InvocationResponse> for ListItem<'_> {
+    fn from(value: &InvocationResponse) -> Self {
+        ListItem::new(Line::styled(format!("{}", dbus_result_to_string(&value.message)), RESULT_STYLE))
     }
 }
