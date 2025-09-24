@@ -3,7 +3,9 @@ use std::{collections::HashMap, error::Error, io::BufReader};
 use async_recursion::async_recursion;
 use tokio::sync::mpsc::{self, Receiver, UnboundedSender};
 use zbus::{
-    names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName}, zvariant::{ObjectPath, OwnedValue, Str, StructureBuilder}, Connection
+    Connection,
+    names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName},
+    zvariant::{ObjectPath, OwnedValue, Str, StructureBuilder},
 };
 use zbus_xml::Node;
 
@@ -116,9 +118,15 @@ impl DbusActor {
                 };
                 match method_call_response {
                     Ok(message) => {
-                        let _ = self
-                            .app_sender
-                            .send(AppMessage::InvocationResponse(InvocationResponse{service, object_path, method_name: method, interface, message}));
+                        let _ = self.app_sender.send(AppMessage::InvocationResponse(
+                            InvocationResponse {
+                                service,
+                                object_path,
+                                method_name: method,
+                                interface,
+                                message,
+                            },
+                        ));
                     }
                     Err(e) => tracing::debug!("Method call error {}", e),
                 };
@@ -199,16 +207,13 @@ impl DbusActorHandle {
             .expect("org.freedesktop.Dbus.Properties is valid interface name");
         let method = OwnedMemberName::try_from("Get").expect("Get is a valid Method");
         let mut values: Vec<zbus::zvariant::OwnedValue> = Vec::new();
-        values.push(OwnedValue::try_from(interface.clone()).expect("OwnedInterfaceName is valid value"));
+        values.push(
+            OwnedValue::try_from(interface.clone()).expect("OwnedInterfaceName is valid value"),
+        );
         values.push(OwnedValue::from(Str::from(property_name)));
 
-        let msg = DbusMessage::MethodCallRequest(
-            service,
-            object,
-            property_interface,
-            method,
-            values,
-        );
+        let msg =
+            DbusMessage::MethodCallRequest(service, object, property_interface, method, values);
         let _ = self.sender.send(msg).await;
     }
 }

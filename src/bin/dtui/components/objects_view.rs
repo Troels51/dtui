@@ -8,7 +8,12 @@ use zbus_names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName, OwnedPropert
 
 use super::Component;
 use crate::{
-    action::{Action, Invocation}, app::Focus, config::Config, dbus_handler::DbusActorHandle, other::active_area_border_color, stateful_tree::{self, StatefulTree}
+    action::{Action, Invocation},
+    app::Focus,
+    config::Config,
+    dbus_handler::DbusActorHandle,
+    other::active_area_border_color,
+    stateful_tree::{self, StatefulTree},
 };
 
 #[derive(Default)]
@@ -71,15 +76,25 @@ impl Component for ObjectsView {
                             match &invokable.invocation_description {
                                 crate::action::InvokableDbusMember::Method { method } => {
                                     return Ok(Some(Action::StartDbusInvocation(invokable)));
-                                },
+                                }
                                 crate::action::InvokableDbusMember::Property { property } => {
-                                    let dbus_actor = self.dbus_actor_handle.clone().expect("Component needs dbus handle");
-                                    dbus_actor.get_property(invokable.service, invokable.object, invokable.interface, property.as_str().to_string()).await;
-                                    return Ok(None)
-                                },
+                                    let dbus_actor = self
+                                        .dbus_actor_handle
+                                        .clone()
+                                        .expect("Component needs dbus handle");
+                                    dbus_actor
+                                        .get_property(
+                                            invokable.service,
+                                            invokable.object,
+                                            invokable.interface,
+                                            property.as_str().to_string(),
+                                        )
+                                        .await;
+                                    return Ok(None);
+                                }
                                 crate::action::InvokableDbusMember::Signal { name } => {
-                                    return Ok(None)
-                                },
+                                    return Ok(None);
+                                }
                             }
                         }
                     }
@@ -101,7 +116,7 @@ impl Component for ObjectsView {
                 self.objects = StatefulTree::from_nodes(objects);
             }
             crate::messages::AppMessage::Services(owned_bus_names) => (),
-            crate::messages::AppMessage::InvocationResponse{..} => {}
+            crate::messages::AppMessage::InvocationResponse { .. } => {}
         }
         Ok(None)
     }
@@ -164,12 +179,13 @@ fn extract_invokable(
                     None
                 }
             }
-        }.map(|invokable| Invocation {
-                service: current_service,
-                object: path,
-                interface,
-                invocation_description: invokable,
-            })
+        }
+        .map(|invokable| Invocation {
+            service: current_service,
+            object: path,
+            interface,
+            invocation_description: invokable,
+        })
     } else {
         None
     }

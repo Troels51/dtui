@@ -1,8 +1,17 @@
+use std::default;
+
 use serde::{Deserialize, Serialize};
 use strum::Display;
 use zbus_names::OwnedBusName;
 
 use crate::{app::Focus, stateful_tree::OwnedMethod};
+
+#[derive(Default, Debug, Clone, PartialEq, Eq, Display, Serialize, Deserialize, Copy)]
+pub enum EditorMode {
+    #[default]
+    Normal,
+    Insert,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Display, Serialize, Deserialize)]
 pub enum Action {
@@ -18,6 +27,7 @@ pub enum Action {
 
     NextFocus,
     Focus(Focus),
+    EditorMode(EditorMode),
     Up,
     Down,
     DownTree, // Go further into an object tree
@@ -37,7 +47,6 @@ pub struct Invocation {
     pub(crate) interface: zbus_names::OwnedInterfaceName,
     pub(crate) invocation_description: InvokableDbusMember,
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InvokableDbusMember {

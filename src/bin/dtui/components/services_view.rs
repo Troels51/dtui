@@ -6,7 +6,8 @@ use zbus_names::OwnedBusName;
 
 use super::Component;
 use crate::{
-    action::Action, app::Focus, config::Config, dbus_handler::DbusActorHandle, messages::InvocationResponse, other::active_area_border_color, stateful_list::StatefulList
+    action::Action, app::Focus, config::Config, dbus_handler::DbusActorHandle,
+    messages::InvocationResponse, other::active_area_border_color, stateful_list::StatefulList,
 };
 
 #[derive(Default)]
@@ -55,7 +56,9 @@ impl Component for ServicesView {
                 Action::GetService => {
                     if let Some(selected_index) = self.services.state.selected() {
                         let item = self.services.items[selected_index].clone();
-                        if let Some(handle) = &self.dbus_actor_handle { handle.request_objects_from(item).await }
+                        if let Some(handle) = &self.dbus_actor_handle {
+                            handle.request_objects_from(item).await
+                        }
                     }
                 }
 
@@ -77,7 +80,7 @@ impl Component for ServicesView {
 
                 self.services = StatefulList::with_items(owned_bus_names);
             }
-            crate::messages::AppMessage::InvocationResponse(InvocationResponse{..}) => {}
+            crate::messages::AppMessage::InvocationResponse(InvocationResponse { .. }) => {}
         }
         Ok(None)
     }

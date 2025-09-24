@@ -12,7 +12,7 @@ pub mod stateful_list;
 pub mod stateful_tree;
 mod tui;
 
-use clap::{command, ArgGroup, Parser, ValueEnum};
+use clap::{ArgGroup, Parser, ValueEnum, command};
 
 use std::error::Error;
 use tracing::level_filters::LevelFilter;

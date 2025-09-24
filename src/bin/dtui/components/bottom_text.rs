@@ -3,7 +3,11 @@ use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
-use crate::{action::Action, app::Focus, config::Config};
+use crate::{
+    action::{Action, EditorMode},
+    app::Focus,
+    config::Config,
+};
 
 #[derive(Default)]
 pub struct BottomText {
@@ -18,9 +22,7 @@ impl BottomText {
     }
 
     fn get_action_key(&self, focus: Focus, action: Action) -> String {
-        
-        self
-            .config
+        self.config
             .keybindings
             .get_key_from_action(focus, action)
             .and_then(|key_events| key_events.first()) // This takes the first key possible, so won't show all possibilities
@@ -42,31 +44,40 @@ impl Component for BottomText {
     async fn update(&mut self, action: Action) -> Result<Option<Action>> {
         if let Action::Focus(focus) = action {
             let next_focus_key = self.get_action_key(Focus::All, Action::NextFocus);
+            let quit_key = self.get_action_key(Focus::All, Action::Quit);
+            let normal_mode =
+                self.get_action_key(Focus::All, Action::EditorMode(EditorMode::Normal));
+            let insert_mode =
+                self.get_action_key(Focus::All, Action::EditorMode(EditorMode::Insert));
+
             self.help_text = match focus {
                 crate::app::Focus::Services => {
                     format!(
-                        "Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: {} | Quit: Esc",
+                        "Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: {} | Quit: {}",
                         next_focus_key,
-                        self.get_action_key(focus, Action::GetService)
+                        self.get_action_key(focus, Action::GetService),
+                        quit_key
                     )
                 }
                 crate::app::Focus::Objects => {
                     format!(
-                        "Change focus: {} | Navigation: ← ↓ ↑ → | Invoke Dbus: {} | Quit: Esc",
+                        "Change focus: {} | Navigation: ← ↓ ↑ → | Invoke Dbus: {} | Quit: {}",
                         next_focus_key,
-                        self.get_action_key(focus, Action::InvokeDbus)
+                        self.get_action_key(focus, Action::InvokeDbus),
+                        quit_key
                     )
                 }
                 crate::app::Focus::Call => {
                     format!(
-                        "Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: {} | Quit: Esc",
+                        "Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: {} | Quit: {}, InsertMode: {}, NormalMode: {}",
                         next_focus_key,
-                        self.get_action_key(focus, Action::CallActiveMethod)
+                        self.get_action_key(focus, Action::CallActiveMethod),
+                        quit_key,
+                        insert_mode,
+                        normal_mode
                     )
                 }
-                crate::app::Focus::All => {
-                    String::new()
-                }
+                crate::app::Focus::All => String::new(),
             };
         }
         Ok(None)

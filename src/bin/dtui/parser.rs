@@ -49,8 +49,9 @@ fn parser_variant<'a>() -> impl Parser<char, zvariant::Value<'static>, Error = S
         .boxed()
         .then_ignore(just("->"))
         .then_with(|s| match s {
-            zvariant::Value::Signature(signature) => get_parser(signature)
-                .map(|variant| zvariant::Value::Value(Box::new(variant))),
+            zvariant::Value::Signature(signature) => {
+                get_parser(signature).map(|variant| zvariant::Value::Value(Box::new(variant)))
+            }
             _ => unreachable!(),
         })
 }

@@ -16,9 +16,10 @@ pub fn init() -> Result<()> {
     eyre_hook.install()?;
     std::panic::set_hook(Box::new(move |panic_info| {
         if let Ok(mut t) = crate::tui::Tui::new()
-            && let Err(r) = t.exit() {
-                error!("Unable to exit Terminal: {:?}", r);
-            }
+            && let Err(r) = t.exit()
+        {
+            error!("Unable to exit Terminal: {:?}", r);
+        }
         let msg = format!("{}", panic_hook.panic_report(panic_info));
         error!("Error: {}", strip_ansi_escapes::strip_str(msg));
         std::process::exit(libc::EXIT_FAILURE);

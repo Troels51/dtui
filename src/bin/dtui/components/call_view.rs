@@ -9,7 +9,13 @@ use tui_textarea::CursorMove;
 
 use super::Component;
 use crate::{
-    action::{Action, Invocation, InvokableDbusMember}, app::Focus, config::Config, dbus_handler::DbusActorHandle, messages::InvocationResponse, other::active_area_border_color, parser::get_parser
+    action::{Action, EditorMode, Invocation, InvokableDbusMember},
+    app::Focus,
+    config::Config,
+    dbus_handler::DbusActorHandle,
+    messages::InvocationResponse,
+    other::active_area_border_color,
+    parser::get_parser,
 };
 
 pub struct MethodArgVisual {
@@ -53,6 +59,7 @@ pub struct CallView {
     active: bool,
     ongoing: Option<OngoingCallInfo>,
     dbus_actor_handle: Option<DbusActorHandle>,
+    editor_mode: EditorMode,
 }
 
 impl CallView {
@@ -209,6 +216,9 @@ impl Component for CallView {
                         }
                     }
                 }
+                Action::EditorMode(mode) => {
+                    self.editor_mode = mode;
+                }
                 _ => (),
             }
         }
@@ -220,46 +230,42 @@ impl Component for CallView {
     }
 
     fn handle_key_event(&mut self, key: crossterm::event::KeyEvent) -> Result<Option<Action>> {
-        // ignore certain keys
-        let ignored = [
-            crossterm::event::KeyCode::Enter,
-            crossterm::event::KeyCode::Home,
-            crossterm::event::KeyCode::End,
-            crossterm::event::KeyCode::PageUp,
-            crossterm::event::KeyCode::PageDown,
-            crossterm::event::KeyCode::Tab,
-            crossterm::event::KeyCode::BackTab,
-        ];
-        if ignored.contains(&key.code) {
-            return Ok(None);
+        if self.editor_mode == EditorMode::Insert {
+            if let Some(ongoing) = &mut self.ongoing {
+                ongoing.method_arg_vis[ongoing.selected]
+                    .text_area
+                    .input(key);
+            }
         }
-        if let Some(ongoing) = &mut self.ongoing {
-            ongoing.method_arg_vis[ongoing.selected]
-                .text_area
-                .input(key);
-        }
+
         Ok(None)
     }
     fn update_from_dbus(
         &mut self,
         dbus_action: crate::messages::AppMessage,
     ) -> Result<Option<Action>> {
-        if let crate::messages::AppMessage::InvocationResponse(InvocationResponse{method_name, message, ..}) = dbus_action {
+        if let crate::messages::AppMessage::InvocationResponse(InvocationResponse {
+            method_name,
+            message,
+            ..
+        }) = dbus_action
+        {
             if let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>()
-                && let Some(ref mut ongoing) = self.ongoing {
-                    for (index, output_field) in ongoing
-                        .method_arg_vis
-                        .iter_mut()
-                        .filter(|field| !field.is_input)
-                        .enumerate()
-                    {
-                        output_field.text_area.move_cursor(CursorMove::Head);
-                        output_field.text_area.delete_line_by_end(); // The way to clear a text area
-                        output_field
-                            .text_area
-                            .insert_str(format!("{}", value.fields()[index]));
-                    }
+                && let Some(ref mut ongoing) = self.ongoing
+            {
+                for (index, output_field) in ongoing
+                    .method_arg_vis
+                    .iter_mut()
+                    .filter(|field| !field.is_input)
+                    .enumerate()
+                {
+                    output_field.text_area.move_cursor(CursorMove::Head);
+                    output_field.text_area.delete_line_by_end(); // The way to clear a text area
+                    output_field
+                        .text_area
+                        .insert_str(format!("{}", value.fields()[index]));
                 }
+            }
         }
         Ok(None)
     }

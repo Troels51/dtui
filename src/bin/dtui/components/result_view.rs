@@ -46,7 +46,6 @@ impl Component for ResultsView {
             }
         } else {
             // Handle action when not in focus
-            
         }
 
         Ok(None)
@@ -77,17 +76,16 @@ impl Component for ResultsView {
 }
 
 fn dbus_result_to_string(message: &zbus::Message) -> String {
-    let message_string = if let Ok(message) =
-        message.body().deserialize::<zbus::zvariant::Structure>()
-    {
-        message
-            .fields()
-            .iter()
-            .map(|field| field.to_string())
-            .join(",")
-    } else {
-        "".to_string()
-    };
+    let message_string =
+        if let Ok(message) = message.body().deserialize::<zbus::zvariant::Structure>() {
+            message
+                .fields()
+                .iter()
+                .map(|field| field.to_string())
+                .join(",")
+        } else {
+            "".to_string()
+        };
     message_string
 }
 
@@ -95,6 +93,9 @@ const RESULT_STYLE: Style = Style::new();
 
 impl From<&InvocationResponse> for ListItem<'_> {
     fn from(value: &InvocationResponse) -> Self {
-        ListItem::new(Line::styled(format!("{}", dbus_result_to_string(&value.message)), RESULT_STYLE))
+        ListItem::new(Line::styled(
+            format!("{}", dbus_result_to_string(&value.message)),
+            RESULT_STYLE,
+        ))
     }
 }

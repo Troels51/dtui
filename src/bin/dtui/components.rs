@@ -3,8 +3,8 @@ use color_eyre::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
 use objects_view::ObjectsView;
 use ratatui::{
-    layout::{Rect, Size},
     Frame,
+    layout::{Rect, Size},
 };
 use services_view::ServicesView;
 use tokio::sync::mpsc::UnboundedSender;

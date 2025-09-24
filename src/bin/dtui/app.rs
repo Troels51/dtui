@@ -11,7 +11,7 @@ use zbus::{Connection, conn};
 
 use crate::{
     Args, BusType,
-    action::Action,
+    action::{Action, EditorMode},
     components::{Component, Components},
     config::Config,
     dbus_handler::DbusActorHandle,
@@ -32,6 +32,7 @@ pub struct App {
     action_rx: mpsc::UnboundedReceiver<Action>,
     dbus_handler: DbusActorHandle,
     dbus_receiver: mpsc::UnboundedReceiver<AppMessage>,
+    editor_mode: crate::action::EditorMode,
 }
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -83,6 +84,7 @@ impl App {
             action_rx,
             dbus_handler,
             dbus_receiver,
+            editor_mode: EditorMode::Normal,
         })
     }
 
@@ -180,6 +182,17 @@ impl App {
         let Some(generic_keymap) = self.config.keybindings.get(&Focus::All) else {
             return Ok(());
         };
+
+        if self.editor_mode == EditorMode::Insert {
+            match generic_keymap.get(&vec![key]) {
+                Some(action) => match action {
+                    Action::EditorMode(editor_mode) => action_tx.send(action.clone())?,
+                    _ => (),
+                },
+                _ => (),
+            }
+            return Ok(());
+        }
         let Some(focus_keymap) = self.config.keybindings.get(&self.focus) else {
             return Ok(());
         };
@@ -238,6 +251,12 @@ impl App {
                         }
                         crate::action::InvokableDbusMember::Property { property } => {}
                         crate::action::InvokableDbusMember::Signal { name } => {}
+                    }
+                }
+                Action::EditorMode(mode) => {
+                    // It only makes sense to change the editor mode when the call view is in focus
+                    if self.focus == Focus::Call {
+                        self.editor_mode = mode;
                     }
                 }
                 _ => {}
