@@ -243,16 +243,6 @@ impl App {
                     info!("Setting focus {:?}", focus);
                     self.focus = focus;
                 }
-                Action::StartDbusInvocation(ref invocation) => {
-                    match &invocation.invocation_description {
-                        crate::action::InvokableDbusMember::Method { method } => {
-                            self.focus = Focus::Call;
-                            let _ = self.action_tx.send(Action::Focus(Focus::Call));
-                        }
-                        crate::action::InvokableDbusMember::Property { property } => {}
-                        crate::action::InvokableDbusMember::Signal { name } => {}
-                    }
-                }
                 Action::EditorMode(mode) => {
                     // It only makes sense to change the editor mode when the call view is in focus
                     if self.focus == Focus::Call {

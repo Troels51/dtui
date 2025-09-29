@@ -14,7 +14,9 @@
       "<enter>": "GetService" // Get service selected
     },
     "Objects": {
-      "<enter>": "InvokeDbus", // Invoke the dbus method/property/signal
+      "<enter>": {"InvokeDbus": "CallMethod"},
+      "g": {"InvokeDbus": "GetProperty"},
+      "s": {"InvokeDbus": "SetProperty"},
       "<right>": "DownTree",
       "<left>": "UpTree"
     },

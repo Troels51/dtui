@@ -5,15 +5,16 @@ use tracing::info;
 use tui_tree_widget::Tree;
 use zbus::zvariant::OwnedObjectPath;
 use zbus_names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName, OwnedPropertyName};
+use zbus_xml::Arg;
 
 use super::Component;
 use crate::{
-    action::{Action, Invocation},
+    action::{Action, Invocation, InvokableDbusMember},
     app::Focus,
     config::Config,
     dbus_handler::DbusActorHandle,
     other::active_area_border_color,
-    stateful_tree::{self, StatefulTree},
+    stateful_tree::{self, OwnedMethod, StatefulTree},
 };
 
 #[derive(Default)]
@@ -64,20 +65,28 @@ impl Component for ObjectsView {
                 Action::UpTree => {
                     self.objects.left();
                 }
-                Action::InvokeDbus => {
+                Action::InvokeDbus(dbus_action) => {
                     info!(
-                        "Invoking dbus method or property {:?}",
+                        "Invoking dbus_action {} on {:?}",
+                        dbus_action,
                         self.objects.state.selected()
                     );
                     if let Some(originating_service) = &self.originating_service {
                         let selected = self.objects.state.selected();
                         let invokable = extract_invokable(originating_service.clone(), selected);
-                        if let Some(invokable) = invokable {
-                            match &invokable.invocation_description {
-                                crate::action::InvokableDbusMember::Method { method } => {
+                        if let Some(mut invokable) = invokable {
+                            match (dbus_action, &invokable.invocation_description) {
+                                (
+                                    crate::action::DbusInvocationAction::CallMethod,
+                                    crate::action::InvokableDbusMember::Method { method },
+                                ) => {
                                     return Ok(Some(Action::StartDbusInvocation(invokable)));
                                 }
-                                crate::action::InvokableDbusMember::Property { property } => {
+
+                                (
+                                    crate::action::DbusInvocationAction::GetProperty,
+                                    crate::action::InvokableDbusMember::Property { property },
+                                ) => {
                                     let dbus_actor = self
                                         .dbus_actor_handle
                                         .clone()
@@ -87,14 +96,19 @@ impl Component for ObjectsView {
                                             invokable.service,
                                             invokable.object,
                                             invokable.interface,
-                                            property.as_str().to_string(),
+                                            property.name.as_str().to_string(),
                                         )
                                         .await;
                                     return Ok(None);
                                 }
-                                crate::action::InvokableDbusMember::Signal { name } => {
-                                    return Ok(None);
+                                (
+                                    crate::action::DbusInvocationAction::SetProperty,
+                                    crate::action::InvokableDbusMember::Property { property },
+                                ) => {
+                                    return Ok(Some(Action::StartDbusInvocation(invokable)));
                                 }
+
+                                _ => (),
                             }
                         }
                     }
@@ -111,12 +125,13 @@ impl Component for ObjectsView {
     ) -> Result<Option<Action>> {
         match dbus_action {
             crate::messages::AppMessage::Objects((service_name, objects)) => {
-                info!("Got objects from service: {}", service_name);
-                self.originating_service = Some(service_name);
-                self.objects = StatefulTree::from_nodes(objects);
-            }
+                        info!("Got objects from service: {}", service_name);
+                        self.originating_service = Some(service_name);
+                        self.objects = StatefulTree::from_nodes(objects);
+                    }
             crate::messages::AppMessage::Services(owned_bus_names) => (),
             crate::messages::AppMessage::InvocationResponse { .. } => {}
+            crate::messages::AppMessage::Error(dbus_error) => {},
         }
         Ok(None)
     }
@@ -164,7 +179,7 @@ fn extract_invokable(
                     selected_iter.next()
                 {
                     Some(crate::action::InvokableDbusMember::Property {
-                        property: OwnedPropertyName::try_from(property.clone()).unwrap(),
+                        property: property.to_owned(),
                     })
                 } else {
                     None

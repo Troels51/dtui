@@ -9,7 +9,7 @@ use zbus::{
 };
 use zbus_xml::Node;
 
-use crate::messages::{AppMessage, DbusMessage, InvocationResponse};
+use crate::messages::{AppMessage, DbusError, DbusMessage, InvocationResponse};
 
 pub struct DbusActor {
     app_sender: UnboundedSender<AppMessage>,
@@ -128,27 +128,16 @@ impl DbusActor {
                             },
                         ));
                     }
-                    Err(e) => tracing::debug!("Method call error {}", e),
-                };
-            }
-            DbusMessage::Invoke(invocation) => {
-                match &invocation.invocation_description {
-                    // TODO: Get this to work
-                    crate::action::InvokableDbusMember::Method { method } => {}
-                    crate::action::InvokableDbusMember::Property { property } => {
-                        let response = self
-                            .connection
-                            .call_method(
-                                Some(invocation.service),
-                                invocation.object,
-                                Some("org.freedesktop.DBus.Properties"),
-                                "Get",
-                                &(),
-                            )
-                            .await;
+                    Err(e) => 
+                    {
+                        tracing::info!("Method call error {}", e); 
+                        let _ = self.app_sender.send(AppMessage::Error(
+                            DbusError {
+                                message: e.to_string(),
+                            },
+                        ));
                     }
-                    crate::action::InvokableDbusMember::Signal { name } => {}
-                }
+                };
             }
         }
     }
@@ -211,6 +200,29 @@ impl DbusActorHandle {
             OwnedValue::try_from(interface.clone()).expect("OwnedInterfaceName is valid value"),
         );
         values.push(OwnedValue::from(Str::from(property_name)));
+
+        let msg =
+            DbusMessage::MethodCallRequest(service, object, property_interface, method, values);
+        let _ = self.sender.send(msg).await;
+    }
+
+    pub async fn set_property(
+        &self,
+        service: OwnedBusName,
+        object: zbus::zvariant::OwnedObjectPath,
+        interface: OwnedInterfaceName,
+        property_name: zbus_names::OwnedPropertyName,
+        value: OwnedValue,
+    ) {
+        let property_interface = OwnedInterfaceName::try_from("org.freedesktop.DBus.Properties")
+            .expect("org.freedesktop.Dbus.Properties is valid interface name");
+        let method = OwnedMemberName::try_from("Set").expect("Set is a valid Method");
+        let mut values: Vec<zbus::zvariant::OwnedValue> = Vec::new();
+        values.push(
+            OwnedValue::try_from(interface.clone()).expect("OwnedInterfaceName is valid value"),
+        );
+        values.push(OwnedValue::from(Str::from(property_name)));
+        values.push(value);
 
         let msg =
             DbusMessage::MethodCallRequest(service, object, property_interface, method, values);

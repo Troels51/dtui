@@ -5,7 +5,10 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
 use crate::{
-    action::Action, config::Config, messages::InvocationResponse, other::active_area_border_color,
+    action::Action,
+    config::Config,
+    messages::{AppMessage, DbusError, InvocationResponse},
+    other::active_area_border_color,
 };
 
 #[derive(Default)]
@@ -14,7 +17,7 @@ pub struct ResultsView {
     config: Config,
     active: bool,
     list_state: ListState,
-    results: Vec<InvocationResponse>,
+    results: Vec<AppMessage>,
 }
 
 impl ResultsView {
@@ -41,7 +44,6 @@ impl Component for ResultsView {
                 Action::Down => {}
                 Action::DownTree => {}
                 Action::UpTree => {}
-                Action::InvokeDbus => {}
                 _ => {}
             }
         } else {
@@ -54,9 +56,7 @@ impl Component for ResultsView {
         &mut self,
         dbus_action: crate::messages::AppMessage,
     ) -> Result<Option<Action>> {
-        if let crate::messages::AppMessage::InvocationResponse(response) = dbus_action {
-            self.results.push(response);
-        }
+        self.results.push(dbus_action);
         Ok(None)
     }
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
@@ -90,12 +90,30 @@ fn dbus_result_to_string(message: &zbus::Message) -> String {
 }
 
 const RESULT_STYLE: Style = Style::new();
+const ERROR_STYLE: Style = Style::new().fg(Color::Red);
 
-impl From<&InvocationResponse> for ListItem<'_> {
-    fn from(value: &InvocationResponse) -> Self {
-        ListItem::new(Line::styled(
-            format!("{}", dbus_result_to_string(&value.message)),
-            RESULT_STYLE,
-        ))
+
+impl From<&AppMessage> for ListItem<'_> {
+    fn from(value: &AppMessage) -> Self {
+        // https://github.com/ratatui/ratatui/issues/128
+        // https://crates.io/crates/tui-widget-list
+        match value {
+            AppMessage::Objects(object) => ListItem::new(Text::styled(
+                format!("Service: {}", &object.0),
+                RESULT_STYLE,
+            )),
+            AppMessage::Services(owned_bus_names) => ListItem::new(Text::styled(
+                format!("All services read"),
+                RESULT_STYLE,
+            )),
+            AppMessage::InvocationResponse(invocation_response) => ListItem::new(Text::styled(
+                format!("{}", dbus_result_to_string(&invocation_response.message)),
+                RESULT_STYLE,
+            )),
+            AppMessage::Error(dbus_error) => ListItem::new(Text::styled(
+                format!("Error! {}", dbus_error.message),
+                ERROR_STYLE,
+            ).alignment(Alignment::Left)),
+        }.add_modifier(Modifier::BOLD)
     }
 }

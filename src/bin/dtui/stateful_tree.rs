@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tui_tree_widget::{TreeItem, TreeState};
-use zbus_names::OwnedMemberName;
-use zbus_xml::{Annotation, Arg, ArgDirection, Method, Node};
+use zbus_names::{OwnedMemberName, OwnedPropertyName};
+use zbus_xml::{Annotation, Arg, ArgDirection, Method, Node, Property};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MemberTypes {
@@ -23,17 +23,18 @@ pub enum DbusIdentifier {
     Interface(String),   // InterfaceName
     Member(MemberTypes), // Can be Method, Properties, Signals
     Method(OwnedMethod), // zbus_name::MemberName
-    Property(String),    // zbus_name::PropertyName
+    Property(OwnedProperty),    // zbus_name::PropertyName
     Signal(String),      // zbus_name::MemberName
 }
 
-// OwnedMethod is zbus_xml::Method but owned
+
+// OwnedMethod and OwnedProperty is zbus_xml::Method/Property but owned
 //TODO: Consider moving getting this or something similar into zbus_xml
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OwnedMethod {
-    name: OwnedMemberName,
-    args: Vec<Arg>,
-    annotations: Vec<Annotation>,
+    pub(crate) name: OwnedMemberName,
+    pub(crate) args: Vec<Arg>,
+    pub(crate) annotations: Vec<Annotation>,
 }
 
 impl From<Method<'_>> for OwnedMethod {
@@ -62,6 +63,52 @@ impl OwnedMethod {
 impl Eq for OwnedMethod {}
 
 impl std::hash::Hash for OwnedMethod {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name().hash(state);
+    }
+}
+
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OwnedProperty {
+    pub(crate) name: OwnedPropertyName,
+    pub(crate) ty: zbus_xml::Signature,
+    pub(crate) access: zbus_xml::PropertyAccess,
+    pub(crate) annotations: Vec<Annotation>,
+}
+
+impl From<Property<'_>> for OwnedProperty {
+    fn from(value: Property<'_>) -> Self {
+        Self {
+            name: value.name().to_owned().into(),
+            ty: value.ty().to_owned(),
+            access: value.access().to_owned(),
+            annotations: value.annotations().to_owned(),
+        }
+    }
+}
+
+
+
+impl OwnedProperty {
+    pub fn name(&self) -> &OwnedPropertyName {
+        &self.name
+    }
+    pub fn ty(&self) -> &zbus_xml::Signature {
+        &self.ty
+    }
+    pub fn access(&self) -> &zbus_xml::PropertyAccess {
+        &self.access
+    }
+    pub fn annotations(&self) -> &Vec<Annotation> {
+        &self.annotations
+    }
+}
+
+// Rely on PartialEq
+impl Eq for OwnedProperty {}
+
+impl std::hash::Hash for OwnedProperty {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name().hash(state);
     }
@@ -184,7 +231,7 @@ fn node_to_treeitems(node: &zbus_xml::Node<'static>) -> Vec<TreeItem<'static, Db
                 .iter()
                 .map(|property| {
                     TreeItem::new_leaf(
-                        DbusIdentifier::Property(property.name().to_string()),
+                        DbusIdentifier::Property(property.clone().into()),
                         format!("{}: {}", property.name(), property.ty().to_string()),
                     )
                 })

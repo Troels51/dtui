@@ -4,7 +4,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
 use crate::{
-    action::{Action, EditorMode},
+    action::{Action, DbusInvocationAction, EditorMode},
     app::Focus,
     config::Config,
 };
@@ -63,7 +63,7 @@ impl Component for BottomText {
                     format!(
                         "Change focus: {} | Navigation: ← ↓ ↑ → | Invoke Dbus: {} | Quit: {}",
                         next_focus_key,
-                        self.get_action_key(focus, Action::InvokeDbus),
+                        self.get_action_key(focus, Action::InvokeDbus(DbusInvocationAction::CallMethod)),
                         quit_key
                     )
                 }
