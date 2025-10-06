@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use chumsky::chain::Chain;
 use zbus::{
     names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName},
     zvariant::{OwnedObjectPath, OwnedValue},
@@ -44,4 +45,15 @@ pub enum AppMessage {
     Services(Vec<OwnedBusName>),
     InvocationResponse(InvocationResponse),
     Error(DbusError)
+}
+
+impl AppMessage {
+    pub fn characters(&self) -> u16 {
+        match self {
+            AppMessage::Objects(object) => object.0.len() as u16,
+            AppMessage::Services(owned_bus_names) => owned_bus_names.first().unwrap().len() as u16,
+            AppMessage::InvocationResponse(invocation_response) => invocation_response.message.body().len() as u16,
+            AppMessage::Error(dbus_error) => dbus_error.message.len() as u16,
+        }
+    }
 }

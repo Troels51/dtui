@@ -1,7 +1,10 @@
+use chumsky::chain::Chain;
 use color_eyre::Result;
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
+use tracing::info;
+use tui_widget_list::ListBuilder;
 
 use super::Component;
 use crate::{
@@ -16,7 +19,7 @@ pub struct ResultsView {
     command_tx: Option<UnboundedSender<Action>>,
     config: Config,
     active: bool,
-    list_state: ListState,
+    list_state: tui_widget_list::ListState,
     results: Vec<AppMessage>,
 }
 
@@ -68,8 +71,14 @@ impl Component for ResultsView {
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
-        let list = List::new(&self.results);
-        frame.render_stateful_widget(list, inner, &mut self.list_state);
+        let builder = ListBuilder::new(|context| {
+            let widget = self.results.get(context.index).unwrap();            
+            (widget, (widget.characters() / context.cross_axis_size) + 1) // We want the number of times the amount of characters can fit into the cross_axis
+        });
+
+
+        let list = tui_widget_list::ListView::new(builder, self.results.len());
+        list.render(inner, frame.buffer_mut(), &mut self.list_state);
 
         Ok(())
     }
@@ -93,27 +102,22 @@ const RESULT_STYLE: Style = Style::new();
 const ERROR_STYLE: Style = Style::new().fg(Color::Red);
 
 
-impl From<&AppMessage> for ListItem<'_> {
-    fn from(value: &AppMessage) -> Self {
-        // https://github.com/ratatui/ratatui/issues/128
-        // https://crates.io/crates/tui-widget-list
-        match value {
-            AppMessage::Objects(object) => ListItem::new(Text::styled(
-                format!("Service: {}", &object.0),
-                RESULT_STYLE,
-            )),
-            AppMessage::Services(owned_bus_names) => ListItem::new(Text::styled(
-                format!("All services read"),
-                RESULT_STYLE,
-            )),
-            AppMessage::InvocationResponse(invocation_response) => ListItem::new(Text::styled(
-                format!("{}", dbus_result_to_string(&invocation_response.message)),
-                RESULT_STYLE,
-            )),
-            AppMessage::Error(dbus_error) => ListItem::new(Text::styled(
-                format!("Error! {}", dbus_error.message),
-                ERROR_STYLE,
-            ).alignment(Alignment::Left)),
-        }.add_modifier(Modifier::BOLD)
+impl Widget for &AppMessage {
+    fn render(self, area: Rect, buf: &mut Buffer)
+    where
+        Self: Sized {
+        match self {
+            AppMessage::Objects(object) => Paragraph::new(
+                format!("Service: {}", &object.0)).style(RESULT_STYLE)
+            ,
+            AppMessage::Services(owned_bus_names) => Paragraph::new(
+                format!("All services read")).style(
+                RESULT_STYLE),
+            AppMessage::InvocationResponse(invocation_response) => Paragraph::new(
+                format!("{}", dbus_result_to_string(&invocation_response.message))).style(RESULT_STYLE),
+            AppMessage::Error(dbus_error) => Paragraph::new(format!("Error! {}", dbus_error.message),
+            ).style(ERROR_STYLE)
+        }.add_modifier(Modifier::BOLD).wrap(Wrap { trim: false }).render(area, buf);
     }
 }
+
