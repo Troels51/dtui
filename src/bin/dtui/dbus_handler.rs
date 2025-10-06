@@ -128,14 +128,11 @@ impl DbusActor {
                             },
                         ));
                     }
-                    Err(e) => 
-                    {
-                        tracing::info!("Method call error {}", e); 
-                        let _ = self.app_sender.send(AppMessage::Error(
-                            DbusError {
-                                message: e.to_string(),
-                            },
-                        ));
+                    Err(e) => {
+                        tracing::info!("Method call error {}", e);
+                        let _ = self.app_sender.send(AppMessage::Error(DbusError {
+                            message: e.to_string(),
+                        }));
                     }
                 };
             }

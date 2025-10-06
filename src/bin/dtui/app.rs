@@ -184,13 +184,7 @@ impl App {
         };
 
         if self.editor_mode == EditorMode::Insert {
-            match generic_keymap.get(&vec![key]) {
-                Some(action) => match action {
-                    Action::EditorMode(editor_mode) => action_tx.send(action.clone())?,
-                    _ => (),
-                },
-                _ => (),
-            }
+            if let Some(action) = generic_keymap.get(&vec![key]) { if let Action::EditorMode(editor_mode) = action { action_tx.send(action.clone())? } }
             return Ok(());
         }
         let Some(focus_keymap) = self.config.keybindings.get(&self.focus) else {

@@ -1,9 +1,11 @@
-
 use serde::{Deserialize, Serialize};
 use strum::Display;
 use zbus_names::OwnedBusName;
 
-use crate::{app::Focus, stateful_tree::{OwnedMethod, OwnedProperty}};
+use crate::{
+    app::Focus,
+    stateful_tree::{OwnedMethod, OwnedProperty},
+};
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Display, Serialize, Deserialize, Copy)]
 pub enum EditorMode {
@@ -61,16 +63,20 @@ impl Invocation {
             InvokableDbusMember::Signal { name } => 1,
         }
     }
-    
+
     pub(crate) fn input_count(&self) -> usize {
         match &self.invocation_description {
-            InvokableDbusMember::Method { method } => method.args().iter().filter(|arg| match arg.direction() {
-                Some(direction) => match direction {
-                    zbus_xml::ArgDirection::In => true,
-                    zbus_xml::ArgDirection::Out => false,
-                },
-                None => false,
-            }).count(),
+            InvokableDbusMember::Method { method } => method
+                .args()
+                .iter()
+                .filter(|arg| match arg.direction() {
+                    Some(direction) => match direction {
+                        zbus_xml::ArgDirection::In => true,
+                        zbus_xml::ArgDirection::Out => false,
+                    },
+                    None => false,
+                })
+                .count(),
             InvokableDbusMember::Property { property } => 1,
             InvokableDbusMember::Signal { name } => 1,
         }
@@ -79,14 +85,7 @@ impl Invocation {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InvokableDbusMember {
-    Method {
-        method: OwnedMethod,
-    },
-    Property {
-        property: OwnedProperty,
-        
-    },
-    Signal {
-        name: zbus_names::OwnedMemberName,
-    },
+    Method { method: OwnedMethod },
+    Property { property: OwnedProperty },
+    Signal { name: zbus_names::OwnedMemberName },
 }

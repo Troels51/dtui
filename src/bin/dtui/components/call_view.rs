@@ -6,8 +6,6 @@ use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::info;
 use tui_textarea::CursorMove;
-use zbus_names::OwnedMemberName;
-use zbus_xml::Method;
 
 use super::Component;
 use crate::{
@@ -18,7 +16,6 @@ use crate::{
     messages::InvocationResponse,
     other::active_area_border_color,
     parser::get_parser,
-    stateful_tree::OwnedProperty,
 };
 
 pub struct MethodArgVisual {
@@ -91,7 +88,7 @@ impl OngoingCallInfo {
                         .title(format!(
                             "name: {} | {}",
                             property.name(),
-                            "input".to_string()
+                            "input"
                         ))
                         .title_bottom(format!("type: {}", property.ty().to_string())),
                 );
@@ -124,12 +121,19 @@ impl OngoingCallInfo {
                     )
                     .await
             }
-            InvokableDbusMember::Property { property } => actor.set_property(
-                self.invocation.service.clone(),
-                self.invocation.object.clone(),
-                self.invocation.interface.clone(),
-                property.name().clone(),
-                values.pop().expect("Properties can only have one value when setting")).await,
+            InvokableDbusMember::Property { property } => {
+                actor
+                    .set_property(
+                        self.invocation.service.clone(),
+                        self.invocation.object.clone(),
+                        self.invocation.interface.clone(),
+                        property.name().clone(),
+                        values
+                            .pop()
+                            .expect("Properties can only have one value when setting"),
+                    )
+                    .await
+            }
             InvokableDbusMember::Signal { name } => todo!(),
         }
     }
@@ -157,7 +161,7 @@ impl CallView {
             Layout::vertical(repeat_n(Constraint::Length(3), nr_args).chain([Constraint::Min(1)]));
         let segments = single_line_layout.split(area);
         for (i, input) in ongoing.method_arg_vis.iter_mut().enumerate() {
-            let emphasis = if i == ongoing.selected && active{
+            let emphasis = if i == ongoing.selected && active {
                 let method_arg: String = input.text_area.lines()[0].clone();
                 let parsed = input.parser.parse(method_arg);
                 match parsed {
@@ -265,7 +269,7 @@ impl Component for CallView {
                 crossterm::event::KeyCode::BackTab => return Ok(None),
                 crossterm::event::KeyCode::Null => return Ok(None),
                 crossterm::event::KeyCode::Esc => return Ok(None),
-                _ => ()
+                _ => (),
             }
             if let Some(ongoing) = &mut self.ongoing {
                 ongoing.method_arg_vis[ongoing.selected]
@@ -285,8 +289,7 @@ impl Component for CallView {
             message,
             ..
         }) = dbus_action
-        {
-            if let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>()
+            && let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>()
                 && let Some(ref mut ongoing) = self.ongoing
             {
                 for (index, output_field) in ongoing
@@ -302,7 +305,6 @@ impl Component for CallView {
                         .insert_str(format!("{}", value.fields()[index]));
                 }
             }
-        }
         Ok(None)
     }
 

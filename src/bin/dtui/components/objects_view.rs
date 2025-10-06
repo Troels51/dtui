@@ -4,17 +4,16 @@ use tokio::sync::mpsc::UnboundedSender;
 use tracing::info;
 use tui_tree_widget::Tree;
 use zbus::zvariant::OwnedObjectPath;
-use zbus_names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName, OwnedPropertyName};
-use zbus_xml::Arg;
+use zbus_names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName};
 
 use super::Component;
 use crate::{
-    action::{Action, Invocation, InvokableDbusMember},
+    action::{Action, Invocation},
     app::Focus,
     config::Config,
     dbus_handler::DbusActorHandle,
     other::active_area_border_color,
-    stateful_tree::{self, OwnedMethod, StatefulTree},
+    stateful_tree::{self, StatefulTree},
 };
 
 #[derive(Default)]
@@ -74,7 +73,7 @@ impl Component for ObjectsView {
                     if let Some(originating_service) = &self.originating_service {
                         let selected = self.objects.state.selected();
                         let invokable = extract_invokable(originating_service.clone(), selected);
-                        if let Some(mut invokable) = invokable {
+                        if let Some(invokable) = invokable {
                             match (dbus_action, &invokable.invocation_description) {
                                 (
                                     crate::action::DbusInvocationAction::CallMethod,
@@ -125,13 +124,13 @@ impl Component for ObjectsView {
     ) -> Result<Option<Action>> {
         match dbus_action {
             crate::messages::AppMessage::Objects((service_name, objects)) => {
-                        info!("Got objects from service: {}", service_name);
-                        self.originating_service = Some(service_name);
-                        self.objects = StatefulTree::from_nodes(objects);
-                    }
+                info!("Got objects from service: {}", service_name);
+                self.originating_service = Some(service_name);
+                self.objects = StatefulTree::from_nodes(objects);
+            }
             crate::messages::AppMessage::Services(owned_bus_names) => (),
             crate::messages::AppMessage::InvocationResponse { .. } => {}
-            crate::messages::AppMessage::Error(dbus_error) => {},
+            crate::messages::AppMessage::Error(dbus_error) => {}
         }
         Ok(None)
     }

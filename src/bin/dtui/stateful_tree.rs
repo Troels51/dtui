@@ -19,14 +19,13 @@ pub enum MemberTypes {
 //    > Methods/Properties/Signals (The actual list of the methods)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DbusIdentifier {
-    Object(String),      // ObjectPath
-    Interface(String),   // InterfaceName
-    Member(MemberTypes), // Can be Method, Properties, Signals
-    Method(OwnedMethod), // zbus_name::MemberName
-    Property(OwnedProperty),    // zbus_name::PropertyName
-    Signal(String),      // zbus_name::MemberName
+    Object(String),          // ObjectPath
+    Interface(String),       // InterfaceName
+    Member(MemberTypes),     // Can be Method, Properties, Signals
+    Method(OwnedMethod),     // zbus_name::MemberName
+    Property(OwnedProperty), // zbus_name::PropertyName
+    Signal(String),          // zbus_name::MemberName
 }
-
 
 // OwnedMethod and OwnedProperty is zbus_xml::Method/Property but owned
 //TODO: Consider moving getting this or something similar into zbus_xml
@@ -68,7 +67,6 @@ impl std::hash::Hash for OwnedMethod {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OwnedProperty {
     pub(crate) name: OwnedPropertyName,
@@ -87,8 +85,6 @@ impl From<Property<'_>> for OwnedProperty {
         }
     }
 }
-
-
 
 impl OwnedProperty {
     pub fn name(&self) -> &OwnedPropertyName {

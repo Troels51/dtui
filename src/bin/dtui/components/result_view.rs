@@ -3,15 +3,11 @@ use color_eyre::Result;
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
-use tracing::info;
 use tui_widget_list::ListBuilder;
 
 use super::Component;
 use crate::{
-    action::Action,
-    config::Config,
-    messages::{AppMessage, DbusError, InvocationResponse},
-    other::active_area_border_color,
+    action::Action, config::Config, messages::AppMessage, other::active_area_border_color,
 };
 
 #[derive(Default)]
@@ -72,10 +68,9 @@ impl Component for ResultsView {
         frame.render_widget(block, area);
 
         let builder = ListBuilder::new(|context| {
-            let widget = self.results.get(context.index).unwrap();            
+            let widget = self.results.get(context.index).unwrap();
             (widget, (widget.characters() / context.cross_axis_size) + 1) // We want the number of times the amount of characters can fit into the cross_axis
         });
-
 
         let list = tui_widget_list::ListView::new(builder, self.results.len());
         list.render(inner, frame.buffer_mut(), &mut self.list_state);
@@ -85,8 +80,8 @@ impl Component for ResultsView {
 }
 
 fn dbus_result_to_string(message: &zbus::Message) -> String {
-    let message_string =
-        if let Ok(message) = message.body().deserialize::<zbus::zvariant::Structure>() {
+    
+    if let Ok(message) = message.body().deserialize::<zbus::zvariant::Structure>() {
             message
                 .fields()
                 .iter()
@@ -94,30 +89,32 @@ fn dbus_result_to_string(message: &zbus::Message) -> String {
                 .join(",")
         } else {
             "".to_string()
-        };
-    message_string
+        }
 }
 
 const RESULT_STYLE: Style = Style::new();
 const ERROR_STYLE: Style = Style::new().fg(Color::Red);
 
-
 impl Widget for &AppMessage {
     fn render(self, area: Rect, buf: &mut Buffer)
     where
-        Self: Sized {
+        Self: Sized,
+    {
         match self {
-            AppMessage::Objects(object) => Paragraph::new(
-                format!("Service: {}", &object.0)).style(RESULT_STYLE)
-            ,
-            AppMessage::Services(owned_bus_names) => Paragraph::new(
-                format!("All services read")).style(
-                RESULT_STYLE),
-            AppMessage::InvocationResponse(invocation_response) => Paragraph::new(
-                format!("{}", dbus_result_to_string(&invocation_response.message))).style(RESULT_STYLE),
-            AppMessage::Error(dbus_error) => Paragraph::new(format!("Error! {}", dbus_error.message),
-            ).style(ERROR_STYLE)
-        }.add_modifier(Modifier::BOLD).wrap(Wrap { trim: false }).render(area, buf);
+            AppMessage::Objects(object) => {
+                Paragraph::new(format!("Service: {}", &object.0)).style(RESULT_STYLE)
+            }
+            AppMessage::Services(owned_bus_names) => {
+                Paragraph::new("All services read".to_string()).style(RESULT_STYLE)
+            }
+            AppMessage::InvocationResponse(invocation_response) => Paragraph::new(dbus_result_to_string(&invocation_response.message).to_string())
+            .style(RESULT_STYLE),
+            AppMessage::Error(dbus_error) => {
+                Paragraph::new(format!("Error! {}", dbus_error.message)).style(ERROR_STYLE)
+            }
+        }
+        .add_modifier(Modifier::BOLD)
+        .wrap(Wrap { trim: false })
+        .render(area, buf);
     }
 }
-

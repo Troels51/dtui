@@ -63,7 +63,10 @@ impl Component for BottomText {
                     format!(
                         "Change focus: {} | Navigation: ← ↓ ↑ → | Invoke Dbus: {} | Quit: {}",
                         next_focus_key,
-                        self.get_action_key(focus, Action::InvokeDbus(DbusInvocationAction::CallMethod)),
+                        self.get_action_key(
+                            focus,
+                            Action::InvokeDbus(DbusInvocationAction::CallMethod)
+                        ),
                         quit_key
                     )
                 }

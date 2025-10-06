@@ -7,8 +7,6 @@ use zbus::{
 };
 use zbus_xml::Node;
 
-use crate::action::Invocation;
-
 #[derive(Debug)]
 pub enum DbusMessage {
     GetObjects(OwnedBusName),
@@ -31,7 +29,6 @@ pub struct InvocationResponse {
     pub message: zbus::Message,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct DbusError {
     pub message: String,
@@ -44,7 +41,7 @@ pub enum AppMessage {
     Objects((OwnedBusName, HashMap<String, Node<'static>>)), // Service name + Map of (Object names, node)
     Services(Vec<OwnedBusName>),
     InvocationResponse(InvocationResponse),
-    Error(DbusError)
+    Error(DbusError),
 }
 
 impl AppMessage {
@@ -52,7 +49,9 @@ impl AppMessage {
         match self {
             AppMessage::Objects(object) => object.0.len() as u16,
             AppMessage::Services(owned_bus_names) => owned_bus_names.first().unwrap().len() as u16,
-            AppMessage::InvocationResponse(invocation_response) => invocation_response.message.body().len() as u16,
+            AppMessage::InvocationResponse(invocation_response) => {
+                invocation_response.message.body().len() as u16
+            }
             AppMessage::Error(dbus_error) => dbus_error.message.len() as u16,
         }
     }
