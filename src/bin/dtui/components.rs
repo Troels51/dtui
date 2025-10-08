@@ -11,7 +11,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     action::Action,
-    components::{call_view::CallView, result_view::ResultsView},
+    components::{call_view::CallView, help_view::HelpView, result_view::ResultsView},
     config::Config,
     dbus_handler::DbusActorHandle,
     messages::AppMessage,
@@ -20,6 +20,7 @@ use crate::{
 
 pub mod bottom_text;
 pub mod call_view;
+pub mod help_view;
 pub mod objects_view;
 pub mod result_view;
 pub mod services_view;
@@ -30,6 +31,7 @@ pub struct Components {
     pub bottom_text: BottomText,
     pub results_view: ResultsView,
     pub call_view: CallView,
+    pub help_view: HelpView,
 }
 
 impl Components {
@@ -40,6 +42,7 @@ impl Components {
             bottom_text: BottomText::new(),
             results_view: ResultsView::new(),
             call_view: CallView::new(),
+            help_view: HelpView::new()
         }
     }
 
@@ -48,6 +51,7 @@ impl Components {
         self.object_view.register_action_handler(tx.clone())?;
         self.results_view.register_action_handler(tx.clone())?;
         self.call_view.register_action_handler(tx.clone())?;
+        self.help_view.register_action_handler(tx.clone())?;
         self.bottom_text.register_action_handler(tx)?;
 
         Ok(())
@@ -58,6 +62,7 @@ impl Components {
         self.object_view.register_config_handler(config.clone())?;
         self.results_view.register_config_handler(config.clone())?;
         self.call_view.register_config_handler(config.clone())?;
+        self.help_view.register_config_handler(config.clone())?;
         self.bottom_text.register_config_handler(config)?;
 
         Ok(())
@@ -81,6 +86,7 @@ impl Components {
         self.object_view.init(size)?;
         self.results_view.init(size)?;
         self.call_view.init(size)?;
+        self.help_view.init(size)?;
         self.bottom_text.init(size)?;
         Ok(())
     }
@@ -92,6 +98,7 @@ impl Components {
             self.object_view.handle_key_event(key)?,
             self.bottom_text.handle_key_event(key)?,
             self.results_view.handle_key_event(key)?,
+            self.help_view.handle_key_event(key)?,
         ];
         Ok(actions.into_iter().flatten().collect()) // filter out nones
     }

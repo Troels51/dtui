@@ -6,8 +6,7 @@
       "<tab>": "NextFocus", // Next focus
       "<down>": "Down", // Down
       "<up>": "Up", // Up
-      "i":    {"EditorMode": "Insert"},
-      "<esc>": {"EditorMode": "Normal"},
+      "?": "Help",
 
     },
     "Services": {
@@ -21,7 +20,12 @@
       "<left>": "UpTree"
     },
     "Call": {
-      "<enter>": "CallActiveMethod" // Call the ongoing method in the call view
+      "<enter>": "CallActiveMethod", // Call the ongoing method in the call view
+            "i":    {"EditorMode": "Insert"},
+      "<esc>": {"EditorMode": "Normal"},
+    },
+    "Help":{
+      "<esc>": {"Focus": "Services"}
     }
   }
 }

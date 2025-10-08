@@ -2,22 +2,23 @@
 ## Features
 
 
-Result view prettier, or bigger
+Result view prettier, or bigger (✓)
     Maybe make a line for service everytime you change service
     Maybe only show the result, but make it expandable if you want to see other things
 
-Property set, use Call view for this
-                                    // TODO: THIS IS WHERE I GOT TO LAST
-Show read/writeable annotations
-Show errors
+Property set, use Call view for this ✓
 
-Show insert mode
+Show errors ✓
+Show insert mode ✓
+Blink when Call view is not used correctly. Do timer ✓
 
-Help view
-
-Documentation for format
+Help view.
+    Write a good help 
+    Documentation for format
 
 Signals
+
+Show read/writeable annotations
 
 
 

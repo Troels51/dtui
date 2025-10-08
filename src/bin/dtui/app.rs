@@ -1,8 +1,8 @@
 use color_eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
-    prelude::Rect,
+    layout::{Constraint, Direction, Flex, Layout},
+    prelude::Rect, widgets::Block,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -41,6 +41,7 @@ pub enum Focus {
     Services,
     Objects,
     Call,
+    Help,
     All, // For keybindings or interactions that are always active
 }
 
@@ -51,6 +52,7 @@ impl Focus {
             Focus::Objects => Focus::Call,
             Focus::Call => Focus::Services,
             Focus::All => Focus::Services,
+            Focus::Help => Focus::Services,
         }
     }
 }
@@ -174,6 +176,13 @@ impl App {
         {
             action_tx.send(action)?;
         }
+        if let Some(action) = self
+            .components
+            .help_view
+            .handle_events(Some(event.clone()))?
+        {
+            action_tx.send(action)?;
+        }
         Ok(())
     }
 
@@ -183,13 +192,14 @@ impl App {
             return Ok(());
         };
 
-        if self.editor_mode == EditorMode::Insert {
-            if let Some(action) = generic_keymap.get(&vec![key]) { if let Action::EditorMode(editor_mode) = action { action_tx.send(action.clone())? } }
-            return Ok(());
-        }
         let Some(focus_keymap) = self.config.keybindings.get(&self.focus) else {
             return Ok(());
         };
+        
+        if self.editor_mode == EditorMode::Insert {
+            if let Some(action) = focus_keymap.get(&vec![key]) { if let Action::EditorMode(editor_mode) = action { action_tx.send(action.clone())? } }
+            return Ok(());
+        }
         for keymap in [generic_keymap, focus_keymap] {
             match keymap.get(&vec![key]) {
                 Some(action) => {
@@ -215,9 +225,6 @@ impl App {
 
     async fn handle_actions(&mut self, tui: &mut Tui) -> Result<()> {
         while let Ok(action) = self.action_rx.try_recv() {
-            if action != Action::Tick && action != Action::Render {
-                info!("{action:?}");
-            }
             match action {
                 Action::Tick => {
                     self.last_tick_key_events.drain(..);
@@ -243,6 +250,10 @@ impl App {
                         self.editor_mode = mode;
                     }
                 }
+                Action::Help => {
+                    info!("Help requested");
+                    self.focus = Focus::Help;
+                }
                 _ => {}
             }
             if let Some(action) = self.components.service_view.update(action.clone()).await? {
@@ -258,6 +269,9 @@ impl App {
                 self.action_tx.send(action)?
             };
             if let Some(action) = self.components.bottom_text.update(action.clone()).await? {
+                self.action_tx.send(action)?
+            };
+            if let Some(action) = self.components.help_view.update(action.clone()).await? {
                 self.action_tx.send(action)?
             };
         }
@@ -344,6 +358,13 @@ impl App {
                     .action_tx
                     .send(Action::Error(format!("Failed to draw: {:?}", err)));
             }
+            // We show the Help view overlaid on the other components as a popup
+            if self.focus == Focus::Help {
+                let pop_up = centered_area(frame.area(), 75, 75);
+                if let Err(err) = self.components.help_view.draw(frame, pop_up) {
+                    let _ = self.action_tx.send(Action::Error(format!("Failed to draw: {:?}", err)));
+                }
+            }
         })?;
         Ok(())
     }
@@ -384,4 +405,12 @@ impl App {
         }
         Ok(())
     }
+}
+
+fn centered_area(area: Rect, percent_y: u16, percent_x: u16) -> Rect {
+    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
+    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
+    let [area] = vertical.areas(area);
+    let [area] = horizontal.areas(area);
+    area
 }

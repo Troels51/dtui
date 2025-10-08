@@ -46,22 +46,24 @@ impl Component for BottomText {
             let next_focus_key = self.get_action_key(Focus::All, Action::NextFocus);
             let quit_key = self.get_action_key(Focus::All, Action::Quit);
             let normal_mode =
-                self.get_action_key(Focus::All, Action::EditorMode(EditorMode::Normal));
+                self.get_action_key(Focus::Call, Action::EditorMode(EditorMode::Normal));
             let insert_mode =
-                self.get_action_key(Focus::All, Action::EditorMode(EditorMode::Insert));
+                self.get_action_key(Focus::Call, Action::EditorMode(EditorMode::Insert));
+            let help_key = self.get_action_key(Focus::All, Action::Help);
 
             self.help_text = match focus {
                 crate::app::Focus::Services => {
                     format!(
-                        "Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: {} | Quit: {}",
+                        "Change focus: {} | Navigation: ← ↓ ↑ → | Get Service: {} | Quit: {} | Help: {}",
                         next_focus_key,
                         self.get_action_key(focus, Action::GetService),
-                        quit_key
+                        quit_key,
+                        help_key
                     )
                 }
                 crate::app::Focus::Objects => {
                     format!(
-                        "Change focus: {} | Navigation: ← ↓ ↑ → | Call method: {} | Get property {} | Set property {} | Quit: {}",
+                        "Change focus: {} | Navigation: ← ↓ ↑ → | Call method: {} | Get property {} | Set property {} | Quit: {} | Help: {}",
                         next_focus_key,
                         self.get_action_key(
                             focus,
@@ -69,20 +71,23 @@ impl Component for BottomText {
                         ),
                         self.get_action_key(focus, Action::InvokeDbus(DbusInvocationAction::GetProperty)),
                         self.get_action_key(focus, Action::InvokeDbus(DbusInvocationAction::SetProperty)),
-                        quit_key
+                        quit_key,
+                        help_key
                     )
                 }
                 crate::app::Focus::Call => {
                     format!(
-                        "Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: {} | Quit: {}, InsertMode: {}, NormalMode: {}",
+                        "Change focus: {} | Navigation: ← ↓ ↑ → | Call Method: {} | Quit: {}, InsertMode: {}, NormalMode: {} | Help: {}",
                         next_focus_key,
                         self.get_action_key(focus, Action::CallActiveMethod),
                         quit_key,
                         insert_mode,
-                        normal_mode
+                        normal_mode,
+                        help_key
                     )
                 }
                 crate::app::Focus::All => String::new(),
+                crate::app::Focus::Help => String::new(),
             };
         }
         Ok(None)
