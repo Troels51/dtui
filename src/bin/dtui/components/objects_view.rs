@@ -77,13 +77,21 @@ impl Component for ObjectsView {
                             match (dbus_action, &invokable.invocation_description) {
                                 (
                                     crate::action::DbusInvocationAction::CallMethod,
-                                    crate::action::InvokableDbusMember::Method { method },
+                                    crate::action::InvokableDbusMember::Method { .. },
+                                )
+                                | (
+                                    crate::action::DbusInvocationAction::SetProperty,
+                                    crate::action::InvokableDbusMember::Property { .. },
                                 ) => {
                                     return Ok(Some(Action::StartDbusInvocation(invokable)));
                                 }
 
                                 (
                                     crate::action::DbusInvocationAction::GetProperty,
+                                    crate::action::InvokableDbusMember::Property { property },
+                                )
+                                | (
+                                    crate::action::DbusInvocationAction::CallMethod,
                                     crate::action::InvokableDbusMember::Property { property },
                                 ) => {
                                     let dbus_actor = self
@@ -99,12 +107,6 @@ impl Component for ObjectsView {
                                         )
                                         .await;
                                     return Ok(None);
-                                }
-                                (
-                                    crate::action::DbusInvocationAction::SetProperty,
-                                    crate::action::InvokableDbusMember::Property { property },
-                                ) => {
-                                    return Ok(Some(Action::StartDbusInvocation(invokable)));
                                 }
 
                                 _ => (),
@@ -128,9 +130,9 @@ impl Component for ObjectsView {
                 self.originating_service = Some(service_name);
                 self.objects = StatefulTree::from_nodes(objects);
             }
-            crate::messages::AppMessage::Services(owned_bus_names) => (),
+            crate::messages::AppMessage::Services(_owned_bus_names) => (),
             crate::messages::AppMessage::InvocationResponse { .. } => {}
-            crate::messages::AppMessage::Error(dbus_error) => {}
+            crate::messages::AppMessage::Error(_dbus_error) => {}
         }
         Ok(None)
     }

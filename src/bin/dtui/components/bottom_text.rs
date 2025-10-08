@@ -61,12 +61,14 @@ impl Component for BottomText {
                 }
                 crate::app::Focus::Objects => {
                     format!(
-                        "Change focus: {} | Navigation: ← ↓ ↑ → | Invoke Dbus: {} | Quit: {}",
+                        "Change focus: {} | Navigation: ← ↓ ↑ → | Call method: {} | Get property {} | Set property {} | Quit: {}",
                         next_focus_key,
                         self.get_action_key(
                             focus,
                             Action::InvokeDbus(DbusInvocationAction::CallMethod)
                         ),
+                        self.get_action_key(focus, Action::InvokeDbus(DbusInvocationAction::GetProperty)),
+                        self.get_action_key(focus, Action::InvokeDbus(DbusInvocationAction::SetProperty)),
                         quit_key
                     )
                 }

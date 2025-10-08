@@ -1,4 +1,4 @@
-use std::{iter::repeat_n, str::FromStr};
+use std::{iter::repeat_n, str::FromStr, time::{Duration, SystemTime}};
 
 use chumsky::Parser;
 use color_eyre::Result;
@@ -85,11 +85,7 @@ impl OngoingCallInfo {
                 text_area.set_block(
                     Block::default()
                         .borders(Borders::ALL)
-                        .title(format!(
-                            "name: {} | {}",
-                            property.name(),
-                            "input"
-                        ))
+                        .title(format!("name: {} | {}", property.name(), "input"))
                         .title_bottom(format!("type: {}", property.ty().to_string())),
                 );
                 let parser = Box::new(get_parser(
@@ -148,6 +144,7 @@ pub struct CallView {
     dbus_actor_handle: Option<DbusActorHandle>,
     editor_mode: EditorMode,
     area: Size,
+    blink_start: Option<SystemTime>,
 }
 
 impl CallView {
@@ -182,6 +179,11 @@ impl CallView {
             input.text_area.set_cursor_line_style(emphasis);
             frame.render_widget(&input.text_area, segments[i]);
         }
+    }
+
+    fn blink_error(&mut self) {
+        info!("Blinking error");
+        self.blink_start = Some(SystemTime::now());
     }
 }
 
@@ -247,6 +249,7 @@ impl Component for CallView {
                 }
                 Action::EditorMode(mode) => {
                     self.editor_mode = mode;
+                    self.blink_start = None;
                 }
                 _ => (),
             }
@@ -262,13 +265,16 @@ impl Component for CallView {
         if self.editor_mode == EditorMode::Insert {
             // Ignore certain keys as they will just confuse
             match key.code {
-                crossterm::event::KeyCode::Enter => return Ok(None),
-                crossterm::event::KeyCode::PageUp => return Ok(None),
-                crossterm::event::KeyCode::PageDown => return Ok(None),
-                crossterm::event::KeyCode::Tab => return Ok(None),
-                crossterm::event::KeyCode::BackTab => return Ok(None),
-                crossterm::event::KeyCode::Null => return Ok(None),
-                crossterm::event::KeyCode::Esc => return Ok(None),
+                crossterm::event::KeyCode::Enter
+                | crossterm::event::KeyCode::PageUp
+                | crossterm::event::KeyCode::PageDown
+                | crossterm::event::KeyCode::Tab
+                | crossterm::event::KeyCode::BackTab
+                | crossterm::event::KeyCode::Null
+                | crossterm::event::KeyCode::Esc => {
+                    self.blink_error();
+                    return Ok(None)
+                }
                 _ => (),
             }
             if let Some(ongoing) = &mut self.ongoing {
@@ -285,33 +291,39 @@ impl Component for CallView {
         dbus_action: crate::messages::AppMessage,
     ) -> Result<Option<Action>> {
         if let crate::messages::AppMessage::InvocationResponse(InvocationResponse {
-            method_name,
+            method_name: _,
             message,
             ..
         }) = dbus_action
             && let Ok(value) = message.body().deserialize::<zbus::zvariant::Structure>()
-                && let Some(ref mut ongoing) = self.ongoing
+            && let Some(ref mut ongoing) = self.ongoing
+        {
+            for (index, output_field) in ongoing
+                .method_arg_vis
+                .iter_mut()
+                .filter(|field| !field.is_input)
+                .enumerate()
             {
-                for (index, output_field) in ongoing
-                    .method_arg_vis
-                    .iter_mut()
-                    .filter(|field| !field.is_input)
-                    .enumerate()
-                {
-                    output_field.text_area.move_cursor(CursorMove::Head);
-                    output_field.text_area.delete_line_by_end(); // The way to clear a text area
-                    output_field
-                        .text_area
-                        .insert_str(format!("{}", value.fields()[index]));
-                }
+                output_field.text_area.move_cursor(CursorMove::Head);
+                output_field.text_area.delete_line_by_end(); // The way to clear a text area
+                output_field
+                    .text_area
+                    .insert_str(format!("{}", value.fields()[index]));
             }
+        }
         Ok(None)
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
+        let titel_style = match self.blink_start.map(|time| time + Duration::from_millis(500) > SystemTime::now()) {
+            Some(true) => Style::new().red(),
+            _ => Style::new(),
+        };
+        let view_titel = Span::from("Call - ");
+        let mode_titel = Span::styled(format!("Mode: {}", self.editor_mode), titel_style);
         let block = Block::default()
             .borders(Borders::ALL)
-            .title(format!("Call - Mode: {}", self.editor_mode))
+            .title(vec![view_titel, mode_titel])
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(active_area_border_color(self.active)));
         let inner = block.inner(area);
