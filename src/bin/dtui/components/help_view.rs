@@ -88,10 +88,10 @@ fn build_help_text_lines() -> Vec<Line<'static>> {
     // Define styles for different elements to maintain consistency.
     let title_style = Style::new().bold().underlined();
     let heading_style = Style::new().bold();
-    let key_style = Style::new().fg(Color::Cyan).bold();
+    let key_style = Style::new();
     let code_style = Style::new().bg(Color::Rgb(60, 60, 60));
     let sig_style = Style::default();
-    let value_style = Style::default().fg(Color::Green);
+    let value_style = Style::default();
 
     vec![
         Line::from(Span::styled("Basic Usage", title_style)),
@@ -272,6 +272,7 @@ fn build_help_text_lines() -> Vec<Line<'static>> {
         ),
         Line::from(""),
         Line::from("──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────".dim()),
+        Line::from(""),
         // --- Parsing Section ---
         Line::from(Span::styled("Parsing", title_style)),
         Line::from("Arguments in the Call view are parsed based on their D-Bus type signature."),
