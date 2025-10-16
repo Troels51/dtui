@@ -252,7 +252,7 @@ impl App {
                 }
                 Action::Help => {
                     info!("Help requested");
-                    self.focus = Focus::Help;
+                    let _ = self.action_tx.send(Action::Focus(Focus::Help));
                 }
                 _ => {}
             }
