@@ -2,7 +2,7 @@ use color_eyre::Result;
 use crossterm::event::KeyEvent;
 use ratatui::{
     layout::{Constraint, Direction, Flex, Layout},
-    prelude::Rect, widgets::Block,
+    prelude::Rect,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -195,9 +195,13 @@ impl App {
         let Some(focus_keymap) = self.config.keybindings.get(&self.focus) else {
             return Ok(());
         };
-        
+
         if self.editor_mode == EditorMode::Insert {
-            if let Some(action) = focus_keymap.get(&vec![key]) { if let Action::EditorMode(editor_mode) = action { action_tx.send(action.clone())? } }
+            if let Some(action) = focus_keymap.get(&vec![key])
+                && let Action::EditorMode(editor_mode) = action
+            {
+                action_tx.send(action.clone())?
+            }
             return Ok(());
         }
         for keymap in [generic_keymap, focus_keymap] {
@@ -362,7 +366,9 @@ impl App {
             if self.focus == Focus::Help {
                 let pop_up = centered_area(frame.area(), 75, 75);
                 if let Err(err) = self.components.help_view.draw(frame, pop_up) {
-                    let _ = self.action_tx.send(Action::Error(format!("Failed to draw: {:?}", err)));
+                    let _ = self
+                        .action_tx
+                        .send(Action::Error(format!("Failed to draw: {:?}", err)));
                 }
             }
         })?;

@@ -42,7 +42,7 @@ impl Components {
             bottom_text: BottomText::new(),
             results_view: ResultsView::new(),
             call_view: CallView::new(),
-            help_view: HelpView::new()
+            help_view: HelpView::new(),
         }
     }
 

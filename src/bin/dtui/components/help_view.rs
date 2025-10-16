@@ -3,11 +3,7 @@ use ratatui::{prelude::*, widgets::*};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::Component;
-use crate::{
-    action::{Action, DbusInvocationAction, EditorMode},
-    app::Focus,
-    config::Config,
-};
+use crate::{action::Action, config::Config};
 
 #[derive(Default)]
 pub struct HelpView {

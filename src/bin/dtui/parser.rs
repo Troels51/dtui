@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 use std::{collections::HashMap, str::FromStr, u32};
-use zbus::zvariant::{self, Array, ObjectPath, Signature, StructureBuilder};
+use zbus::zvariant::{self, ObjectPath, Signature, StructureBuilder};
 
 /// Create a parser from a Signature.
 /// The language that this parses is a human readable version of the dbus format.

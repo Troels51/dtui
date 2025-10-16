@@ -1,4 +1,8 @@
-use std::{iter::repeat_n, str::FromStr, time::{Duration, SystemTime}};
+use std::{
+    iter::repeat_n,
+    str::FromStr,
+    time::{Duration, SystemTime},
+};
 
 use chumsky::Parser;
 use color_eyre::Result;
@@ -273,7 +277,7 @@ impl Component for CallView {
                 | crossterm::event::KeyCode::Null
                 | crossterm::event::KeyCode::Esc => {
                     self.blink_error();
-                    return Ok(None)
+                    return Ok(None);
                 }
                 _ => (),
             }
@@ -315,7 +319,10 @@ impl Component for CallView {
     }
 
     fn draw(&mut self, frame: &mut Frame, area: Rect) -> Result<()> {
-        let titel_style = match self.blink_start.map(|time| time + Duration::from_millis(500) > SystemTime::now()) {
+        let titel_style = match self
+            .blink_start
+            .map(|time| time + Duration::from_millis(500) > SystemTime::now())
+        {
             Some(true) => Style::new().red(),
             _ => Style::new(),
         };

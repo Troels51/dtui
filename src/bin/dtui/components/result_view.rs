@@ -80,16 +80,15 @@ impl Component for ResultsView {
 }
 
 fn dbus_result_to_string(message: &zbus::Message) -> String {
-    
     if let Ok(message) = message.body().deserialize::<zbus::zvariant::Structure>() {
-            message
-                .fields()
-                .iter()
-                .map(|field| field.to_string())
-                .join(",")
-        } else {
-            "".to_string()
-        }
+        message
+            .fields()
+            .iter()
+            .map(|field| field.to_string())
+            .join(",")
+    } else {
+        "".to_string()
+    }
 }
 
 const RESULT_STYLE: Style = Style::new();
@@ -107,8 +106,10 @@ impl Widget for &AppMessage {
             AppMessage::Services(owned_bus_names) => {
                 Paragraph::new("All services read".to_string()).style(RESULT_STYLE)
             }
-            AppMessage::InvocationResponse(invocation_response) => Paragraph::new(dbus_result_to_string(&invocation_response.message).to_string())
-            .style(RESULT_STYLE),
+            AppMessage::InvocationResponse(invocation_response) => {
+                Paragraph::new(dbus_result_to_string(&invocation_response.message).to_string())
+                    .style(RESULT_STYLE)
+            }
             AppMessage::Error(dbus_error) => {
                 Paragraph::new(format!("Error! {}", dbus_error.message)).style(ERROR_STYLE)
             }

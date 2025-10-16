@@ -69,8 +69,14 @@ impl Component for BottomText {
                             focus,
                             Action::InvokeDbus(DbusInvocationAction::CallMethod)
                         ),
-                        self.get_action_key(focus, Action::InvokeDbus(DbusInvocationAction::GetProperty)),
-                        self.get_action_key(focus, Action::InvokeDbus(DbusInvocationAction::SetProperty)),
+                        self.get_action_key(
+                            focus,
+                            Action::InvokeDbus(DbusInvocationAction::GetProperty)
+                        ),
+                        self.get_action_key(
+                            focus,
+                            Action::InvokeDbus(DbusInvocationAction::SetProperty)
+                        ),
                         quit_key,
                         help_key
                     )
