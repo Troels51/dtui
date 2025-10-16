@@ -4,8 +4,10 @@
       "q": "Quit", // Quit the application
       "<Ctrl-z>": "Suspend", // Suspend the application
       "<tab>": "NextFocus", // Next focus
-      "<down>": "Down", // Down
-      "<up>": "Up", // Up
+      "<down>": "Down",
+      "j": "Down",
+      "<up>": "Up",
+      "k": "Up",
       "?": "Help",
 
     },
@@ -17,7 +19,9 @@
       "g": {"InvokeDbus": "GetProperty"},
       "s": {"InvokeDbus": "SetProperty"},
       "<right>": "DownTree",
-      "<left>": "UpTree"
+      "l": "DownTree",
+      "<left>": "UpTree",
+      "h": "UpTree",
     },
     "Call": {
       "<enter>": "CallActiveMethod", // Call the ongoing method in the call view
