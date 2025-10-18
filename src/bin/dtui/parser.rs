@@ -467,10 +467,10 @@ fn test_array() {
         fields: &[&Signature::Str],
     });
     let mut array = zvariant::Array::new(&struct_signature);
-    array.append(one_element_struct("a".to_string()));
-    array.append(one_element_struct("b".to_string()));
-    array.append(one_element_struct("c".to_string()));
-    array.append(one_element_struct("d".to_string()));
+    let _ = array.append(one_element_struct("a".to_string()));
+    let _ = array.append(one_element_struct("b".to_string()));
+    let _ = array.append(one_element_struct("c".to_string()));
+    let _ = array.append(one_element_struct("d".to_string()));
     test_generic_signature(r#"[("a"),("b"),("c"),("d")]"#, "a(s)", array.into());
 
     // Array of dicts
@@ -479,10 +479,10 @@ fn test_array() {
         key: Signature::Str.into(),
         value: Signature::Str.into(),
     });
-    array.append(zvariant::Value::Dict(
+    let _ = array.append(zvariant::Value::Dict(
         HashMap::from([("a", "1"), ("b", "2")]).into(),
     ));
-    array.append(zvariant::Value::Dict(
+    let _ = array.append(zvariant::Value::Dict(
         HashMap::from([("c", "3"), ("d", "4")]).into(),
     ));
     test_generic_signature(
@@ -569,10 +569,10 @@ fn test_array_of_struct_from_examples() {
         fields: &[&Signature::I32, &Signature::Str],
     });
     let mut array = zvariant::Array::new(&struct_signature);
-    array.append(zvariant::Value::Structure(zvariant::Structure::from((
+    let _ = array.append(zvariant::Value::Structure(zvariant::Structure::from((
         1, "a",
     ))));
-    array.append(zvariant::Value::Structure(zvariant::Structure::from((
+    let _ = array.append(zvariant::Value::Structure(zvariant::Structure::from((
         2, "b",
     ))));
 

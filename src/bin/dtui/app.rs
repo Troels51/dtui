@@ -198,7 +198,7 @@ impl App {
 
         if self.editor_mode == EditorMode::Insert {
             if let Some(action) = focus_keymap.get(&vec![key])
-                && let Action::EditorMode(editor_mode) = action
+                && let Action::EditorMode(..) = action
             {
                 action_tx.send(action.clone())?
             }
@@ -223,6 +223,7 @@ impl App {
                 }
             }
         }
+        let _ = self.components.handle_key_event(key);
 
         Ok(())
     }
@@ -375,7 +376,7 @@ impl App {
         Ok(())
     }
 
-    fn handle_dbus_actions(&mut self, tui: &mut Tui) -> Result<()> {
+    fn handle_dbus_actions(&mut self, _tui: &mut Tui) -> Result<()> {
         while let Ok(action) = self.dbus_receiver.try_recv() {
             if let Some(action) = self
                 .components

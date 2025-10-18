@@ -1,4 +1,3 @@
-use chumsky::chain::Chain;
 use color_eyre::Result;
 use itertools::Itertools;
 use ratatui::{prelude::*, widgets::*};
@@ -103,7 +102,7 @@ impl Widget for &AppMessage {
             AppMessage::Objects(object) => {
                 Paragraph::new(format!("Service: {}", &object.0)).style(RESULT_STYLE)
             }
-            AppMessage::Services(owned_bus_names) => {
+            AppMessage::Services(..) => {
                 Paragraph::new("All services read".to_string()).style(RESULT_STYLE)
             }
             AppMessage::InvocationResponse(invocation_response) => {

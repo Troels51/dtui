@@ -81,7 +81,7 @@ impl Component for ServicesView {
                 self.services = StatefulList::with_items(owned_bus_names);
             }
             crate::messages::AppMessage::InvocationResponse(InvocationResponse { .. }) => {}
-            crate::messages::AppMessage::Error(dbus_error) => {}
+            crate::messages::AppMessage::Error(..) => {}
         }
         Ok(None)
     }

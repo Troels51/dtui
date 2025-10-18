@@ -59,8 +59,8 @@ impl Invocation {
     pub(crate) fn nr_args(&self) -> usize {
         match &self.invocation_description {
             InvokableDbusMember::Method { method } => method.args().len(),
-            InvokableDbusMember::Property { property } => 1,
-            InvokableDbusMember::Signal { name } => 1,
+            InvokableDbusMember::Property { .. } => 1,
+            InvokableDbusMember::Signal { .. } => 1,
         }
     }
 
@@ -77,8 +77,8 @@ impl Invocation {
                     None => false,
                 })
                 .count(),
-            InvokableDbusMember::Property { property } => 1,
-            InvokableDbusMember::Signal { name } => 1,
+            InvokableDbusMember::Property { .. } => 1,
+            InvokableDbusMember::Signal { .. } => 1,
         }
     }
 }

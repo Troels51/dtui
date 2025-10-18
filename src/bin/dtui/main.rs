@@ -18,7 +18,7 @@ use std::error::Error;
 use tracing::level_filters::LevelFilter;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
-enum BusType {
+pub enum BusType {
     System,
     Session,
 }

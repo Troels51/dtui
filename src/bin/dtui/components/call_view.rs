@@ -36,7 +36,7 @@ struct OngoingCallInfo {
 }
 
 impl OngoingCallInfo {
-    fn new(call: Invocation, area: Size) -> Option<OngoingCallInfo> {
+    fn new(call: Invocation, _area: Size) -> Option<OngoingCallInfo> {
         let mut call_info = OngoingCallInfo {
             invocation: call,
             method_arg_vis: vec![],
@@ -45,8 +45,6 @@ impl OngoingCallInfo {
         match &call_info.invocation.invocation_description {
             InvokableDbusMember::Method { method } => {
                 // First time init of text areas
-                let args = method.args();
-
                 for arg in method.args().iter() {
                     let mut text_area = tui_textarea::TextArea::default();
                     let inout: String = if let Some(direction) = arg.direction() {
@@ -104,7 +102,7 @@ impl OngoingCallInfo {
 
                 Some(call_info)
             }
-            InvokableDbusMember::Signal { name } => todo!(),
+            InvokableDbusMember::Signal { .. } => todo!(),
         }
     }
 
@@ -134,7 +132,7 @@ impl OngoingCallInfo {
                     )
                     .await
             }
-            InvokableDbusMember::Signal { name } => todo!(),
+            InvokableDbusMember::Signal { .. } => todo!(),
         }
     }
 }
