@@ -111,6 +111,9 @@ impl Component for ObjectsView {
 
                                 _ => (),
                             }
+                        } else {
+                            // If not an invokable member toggle the tree
+                            self.objects.state.toggle(selected.to_vec());
                         }
                     }
                 }
