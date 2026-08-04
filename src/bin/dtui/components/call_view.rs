@@ -24,9 +24,18 @@ use crate::{
 
 pub struct MethodArgVisual {
     pub text_area: tui_textarea::TextArea<'static>,
-    pub parser:
-        Box<dyn Parser<char, zbus::zvariant::Value<'static>, Error = chumsky::error::Simple<char>>>,
+    // chumsky parsers borrow from the input they parse, so we keep the signature around and
+    // build a parser on demand instead of storing one.
+    pub signature: zbus::zvariant::Signature,
     pub is_input: bool, // Is this Arg an input or output
+}
+
+impl MethodArgVisual {
+    fn parse(&self) -> Result<zbus::zvariant::Value<'static>, Vec<chumsky::error::Rich<'_, char>>> {
+        get_parser(self.signature.clone())
+            .parse(self.text_area.lines()[0].as_str())
+            .into_result()
+    }
 }
 // Encapsulates the information about the ongoing call
 struct OngoingCallInfo {
@@ -63,17 +72,16 @@ impl OngoingCallInfo {
                             .title(format!("name: {} | {}", arg.name().unwrap(), inout))
                             .title_bottom(format!("type: {}", arg.ty().to_string())),
                     );
-                    let parser = get_parser(
+                    let signature =
                         zbus::zvariant::Signature::from_str(arg.ty().to_string().as_str())
-                            .expect("The type description for the method we got was not good"),
-                    );
+                            .expect("The type description for the method we got was not good");
                     let input = match arg.direction().unwrap_or(zbus_xml::ArgDirection::In) {
                         zbus_xml::ArgDirection::In => true,
                         zbus_xml::ArgDirection::Out => false,
                     };
                     call_info.method_arg_vis.push(MethodArgVisual {
                         text_area,
-                        parser: Box::new(parser),
+                        signature,
                         is_input: input,
                     });
                 }
@@ -90,13 +98,12 @@ impl OngoingCallInfo {
                         .title(format!("name: {} | {}", property.name(), "input"))
                         .title_bottom(format!("type: {}", property.ty().to_string())),
                 );
-                let parser = Box::new(get_parser(
+                let signature =
                     zbus::zvariant::Signature::from_str(property.ty().to_string().as_str())
-                        .expect("The type description for the method we got was not good"),
-                ));
+                        .expect("The type description for the method we got was not good");
                 call_info.method_arg_vis.push(MethodArgVisual {
                     text_area,
-                    parser,
+                    signature,
                     is_input: true,
                 });
 
@@ -161,9 +168,7 @@ impl CallView {
         let segments = single_line_layout.split(area);
         for (i, input) in ongoing.method_arg_vis.iter_mut().enumerate() {
             let emphasis = if i == ongoing.selected && active {
-                let method_arg: String = input.text_area.lines()[0].clone();
-                let parsed = input.parser.parse(method_arg);
-                match parsed {
+                match input.parse() {
                     Ok(_) => Style::default().fg(Color::Green),
                     Err(_) => Style::default().fg(Color::Red),
                 }
@@ -230,11 +235,11 @@ impl Component for CallView {
                             .method_arg_vis
                             .iter()
                             .filter(|input| input.is_input)
-                            .map(|input| input.parser.parse(input.text_area.lines()[0].clone()));
+                            .map(|input| input.parse());
                         if parses.clone().all(
                             |result: Result<
                                 zbus::zvariant::Value<'static>,
-                                Vec<chumsky::error::Simple<char>>,
+                                Vec<chumsky::error::Rich<'_, char>>,
                             >| Result::is_ok(&result),
                         ) {
                             let values: Vec<zbus::zvariant::OwnedValue> = parses

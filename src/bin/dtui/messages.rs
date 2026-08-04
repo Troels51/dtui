@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use chumsky::chain::Chain;
 use zbus::{
     names::{OwnedBusName, OwnedInterfaceName, OwnedMemberName},
     zvariant::{OwnedObjectPath, OwnedValue},

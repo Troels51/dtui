@@ -28,7 +28,7 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter", "json", "fmt"] }
 tracing-journald = "0.3.1"
 tui-textarea = "0.7"
-chumsky = "0.9.3"
+chumsky = "0.13"
 zbus = {version = "5.11.0", features = ["tokio", "serde_bytes"]}
 zbus_names = "4.2.0"
 zbus_xml = "5.0.2"
