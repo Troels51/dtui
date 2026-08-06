@@ -1,6 +1,6 @@
 [package]
 name = "dtui"
-version = "3.0.0"
+version = "3.1.0"
 edition = "2024"
 default-run = "dtui"
 authors = ["Troels Hoffmeyer <troels.d.hoffmeyer@gmail.com>"]
@@ -28,7 +28,7 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter", "json", "fmt"] }
 tracing-journald = "0.3.1"
 tui-textarea = "0.7"
-chumsky = "0.13"
+chumsky = "0.13.0"
 zbus = {version = "5.11.0", features = ["tokio", "serde_bytes"]}
 zbus_names = "4.2.0"
 zbus_xml = "5.0.2"
