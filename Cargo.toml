@@ -1,6 +1,6 @@
 [package]
 name = "dtui"
-version = "3.1.0"
+version = "3.1.1"
 edition = "2024"
 default-run = "dtui"
 authors = ["Troels Hoffmeyer <troels.d.hoffmeyer@gmail.com>"]
